@@ -110,6 +110,22 @@ export function UsersPage() {
                         <div className="ml-3">
                           <p className="text-sm font-medium text-gray-900">{user.name}</p>
                           <p className="text-sm text-gray-500">{user.email}</p>
+                          {user.projectIds && user.projectIds.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {user.projectIds.map(projectId => {
+                                const project = projects.find(p => p.id === projectId);
+                                return project ? (
+                                  <span
+                                    key={projectId}
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                                  >
+                                    <Building2 className="w-3 h-3 mr-1" />
+                                    {project.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -128,10 +144,10 @@ export function UsersPage() {
                             setSelectedUser(user);
                             setIsModalOpen(true);
                           }}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200"
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                           <Building2 className="h-4 w-4 mr-1" />
-                          Asignar Obras
+                          {user.projectIds?.length ? 'Gestionar Obras' : 'Asignar Obras'}
                         </button>
                       </div>
                     </div>

@@ -237,20 +237,17 @@ export class DocumentService {
         throw new Error('Usuario no autenticado');
       }
 
-      let documentsQuery = collection(db, 'documents');
+      // Obtener los trabajadores según los permisos del usuario
+      const workers = await WorkerService.getWorkers();
+      const workerIds = workers.map(w => w.id);
       
-      // Si es usuario secundario, filtrar por sus proyectos asignados
-      if (user.role === 'secondary' && user.projectIds?.length) {
-        documentsQuery = query(
-          documentsQuery,
-          where('projectId', 'in', user.projectIds)
-        );
-      }
+      // Consultar documentos solo de los trabajadores permitidos
+      const documentsQuery = query(
+        collection(db, 'documents'),
+        where('workerId', 'in', workerIds)
+      );
       
-      const [querySnapshot, workers] = await Promise.all([
-        getDocs(documentsQuery),
-        WorkerService.getWorkers()
-      ]);
+      const querySnapshot = await getDocs(documentsQuery);
 
       const documents = querySnapshot.docs.map(doc => ({
         id: doc.id,
