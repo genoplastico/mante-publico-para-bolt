@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { WorkersPage } from './pages/WorkersPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthService } from './services/auth';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -34,6 +35,7 @@ function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/workers" element={<WorkersPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
