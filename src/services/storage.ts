@@ -1,19 +1,37 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 import { storage } from '../config/firebase';
 import { AuthService } from './auth';
 
+interface UploadOptions {
+  disableScaling?: boolean;
+}
+
 export class StorageService {
-  static async uploadFile(file: File, path: string): Promise<string> {
+  static async uploadFile(file: File, path: string, options: UploadOptions = {}): Promise<string> {
     try {
       const user = AuthService.getCurrentUser();
       if (!user || !user.id) {
         throw new Error('Debe iniciar sesión para realizar esta acción');
       }
 
+      let fileToUpload = file;
+      
+      // Procesar imagen si es necesario
+      if (!options.disableScaling && file.type.startsWith('image/')) {
+        try {
+          const imageFile = await StorageService.processImage(file);
+          fileToUpload = imageFile;
+        } catch (error) {
+          console.warn('Error processing image:', error);
+          // Si falla el procesamiento, continuamos con el archivo original
+        }
+      }
+
       const storageRef = ref(storage, path);
       
       try {
-        const snapshot = await uploadBytes(storageRef, file);
+        const snapshot = await uploadBytes(storageRef, fileToUpload);
         const url = await getDownloadURL(snapshot.ref);
         return url;
       } catch (uploadError: any) {
@@ -66,5 +84,22 @@ export class StorageService {
     }
 
     return null;
+  }
+
+  private static async processImage(file: File): Promise<File> {
+    const options = {
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+      maxSizeMB: 5,
+      preserveExif: true,
+    };
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      return compressedFile;
+    } catch (error) {
+      console.error('Error processing image:', error);
+      throw error;
+    }
   }
 }

@@ -55,10 +55,11 @@ interface CreateDocumentParams {
   type: DocumentType;
   file: File;
   expiryDate?: string;
+  disableScaling?: boolean;
 }
 
 export class DocumentService {
-  static async uploadDocument({ workerId, type, file, expiryDate }: CreateDocumentParams): Promise<Document> {
+  static async uploadDocument({ workerId, type, file, expiryDate, disableScaling }: CreateDocumentParams): Promise<Document> {
     try {
       // Validar el archivo
       const validationError = StorageService.validateFile(file);
@@ -70,7 +71,7 @@ export class DocumentService {
       const filePath = StorageService.generateFilePath(workerId, file.name);
       
       // Upload file to Firebase Storage
-      const url = await StorageService.uploadFile(file, filePath);
+      const url = await StorageService.uploadFile(file, filePath, { disableScaling });
 
       const metadata = DOCUMENT_METADATA[type];
     

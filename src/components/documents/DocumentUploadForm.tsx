@@ -22,6 +22,7 @@ const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
 export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [disableScaling, setDisableScaling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -49,7 +50,8 @@ export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormPr
         workerId,
         type,
         file: selectedFile,
-        expiryDate: expiryDate || undefined
+        expiryDate: expiryDate || undefined,
+        disableScaling
       });
       onSuccess();
     } catch (err) {
@@ -167,6 +169,21 @@ export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormPr
           disabled={isUploading}
         />
       </div>
+      
+      {selectedFile?.type.startsWith('image/') && (
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="disableScaling"
+            checked={disableScaling}
+            onChange={(e) => setDisableScaling(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="disableScaling" className="ml-2 block text-sm text-gray-700">
+            Mantener resolución original
+          </label>
+        </div>
+      )}
 
       <div className="flex justify-end space-x-3 pt-4">
         <button
