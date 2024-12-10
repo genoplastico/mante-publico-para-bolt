@@ -5,14 +5,14 @@ import type { Notification } from '../../types';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  notifications: Notification[];
-  onMarkNotificationAsRead: (id: string) => void;
+  notifications?: Notification[];
+  onMarkNotificationAsRead?: (id: string) => void;
 }
 
 export function DashboardLayout({
   children,
-  notifications,
-  onMarkNotificationAsRead,
+  notifications = [],
+  onMarkNotificationAsRead = () => {},
 }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">

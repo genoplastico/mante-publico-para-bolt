@@ -1,11 +1,15 @@
 import React from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Users, FileText, Calendar, Building2 } from 'lucide-react';
+import { StatCard } from '../components/ui/StatCard';
+import { EmptyState } from '../components/ui/EmptyState';
 import type { Project, Worker } from '../types';
 import { WorkersList } from '../components/workers/WorkersList';
 import { WorkerDetailsPage } from './WorkerDetailsPage';
 import { WorkerForm } from '../components/workers/WorkerForm';
 import { Modal } from '../components/ui/Modal';
+import { useNotificationsContext } from '../contexts/NotificationsContext';
+import { WorkerService } from '../services/workers';
 
 interface ProjectDetailsPageProps {
   project: Project;
@@ -14,8 +18,39 @@ interface ProjectDetailsPageProps {
 
 export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps) {
   const [isWorkerModalOpen, setIsWorkerModalOpen] = React.useState(false);
-  const [workers] = React.useState<Worker[]>([]);
+  const [workers, setWorkers] = React.useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = React.useState<Worker | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const { notifications, markAsRead } = useNotificationsContext();
+
+  React.useEffect(() => {
+    loadWorkers();
+  }, [project.id]);
+
+  const loadWorkers = async () => {
+    try {
+      setIsLoading(true);
+      const projectWorkers = await WorkerService.getWorkers(project.id);
+      setWorkers(projectWorkers);
+    } catch (error) {
+      console.error('Error loading workers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddWorker = async (data: Omit<Worker, 'id' | 'documents'>) => {
+    try {
+      const newWorker = await WorkerService.createWorker({
+        ...data,
+        projectIds: [project.id]
+      });
+      setWorkers(prev => [...prev, newWorker]);
+      setIsWorkerModalOpen(false);
+    } catch (error) {
+      console.error('Error adding worker:', error);
+    }
+  };
 
   if (selectedWorker) {
     return (
@@ -27,7 +62,7 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout notifications={notifications} onMarkNotificationAsRead={markAsRead}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -126,10 +161,7 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
         title="Agregar Operario"
       >
         <WorkerForm
-          onSubmit={(data) => {
-            console.log('Nuevo operario:', data);
-            setIsWorkerModalOpen(false);
-          }}
+          onSubmit={handleAddWorker}
         />
       </Modal>
     </DashboardLayout>

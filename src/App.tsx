@@ -1,47 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { DocumentsPage } from './pages/DocumentsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthService } from './services/auth';
-import type { Notification } from './types';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'document_expiring',
-      title: 'Documento por vencer',
-      message: 'El carnet de salud de Juan Pérez vence en 7 días',
-      createdAt: new Date().toISOString(),
-      read: false,
-      metadata: {
-        workerId: '1',
-        documentId: '1'
-      }
-    },
-    {
-      id: '2',
-      type: 'document_expired',
-      title: 'Documento vencido',
-      message: 'El certificado de BPS ha vencido',
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      read: false,
-      metadata: {
-        documentId: '2',
-        projectId: '1'
-      }
-    }
-  ]);
-
-  const handleMarkNotificationAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-  }, []);
 
   useEffect(() => {
     setIsAuthenticated(AuthService.isAuthenticated());
@@ -52,14 +20,26 @@ function App() {
   }, []);
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <ErrorBoundary>
+        <LoginPage onLogin={handleLogin} />
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <ProjectsPage
-      notifications={notifications}
-      onMarkNotificationAsRead={handleMarkNotificationAsRead}
-    />
+    <ErrorBoundary>
+      <NotificationsProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </NotificationsProvider>
+    </ErrorBoundary>
   );
 }
 

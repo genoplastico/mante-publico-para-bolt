@@ -1,69 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import type { Project } from '../types';
+import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { ProjectDetailsPage } from './ProjectDetailsPage';
+import { ProjectService } from '../services/projects';
 
-export function ProjectsPage({
-  notifications,
-  onMarkNotificationAsRead
-}: ProjectsPageProps) {
+export function ProjectsPage() {
+  const { notifications, markAsRead } = useNotificationsContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: '1',
-      name: 'Edificio Residencial Torres del Puerto',
-      isActive: true,
-      createdAt: '2024-03-15',
-      updatedAt: '2024-03-20',
-    },
-    {
-      id: '2',
-      name: 'Centro Comercial Plaza Nueva',
-      isActive: true,
-      createdAt: '2024-02-01',
-      updatedAt: '2024-03-19',
-    },
-    {
-      id: '3',
-      name: 'Hospital Regional Norte',
-      isActive: false,
-      createdAt: '2023-08-15',
-      updatedAt: '2024-01-20',
-    },
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateProject = (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newProject: Project = {
-      ...data,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setProjects((prev) => [...prev, newProject]);
-    setIsModalOpen(false);
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const fetchedProjects = await ProjectService.getProjects();
+      setProjects(fetchedProjects);
+    } catch (err) {
+      setError('Error al cargar los proyectos');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditProject = (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!selectedProject) return;
-    
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === selectedProject.id
-          ? {
-              ...project,
-              ...data,
-              updatedAt: new Date().toISOString(),
-            }
-          : project
-      )
-    );
-    setSelectedProject(null);
-    setIsModalOpen(false);
+  const handleCreateProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newProject = await ProjectService.createProject(data);
+      setProjects(prev => [...prev, newProject]);
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Error creating project:', err);
+    }
+  };
+
+  const handleEditProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      if (!selectedProject) return;
+      await ProjectService.updateProject(selectedProject.id, data);
+      setProjects(prev =>
+        prev.map(project =>
+          project.id === selectedProject.id
+            ? { ...project, ...data }
+            : project
+        )
+      );
+      setSelectedProject(null);
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Error updating project:', err);
+    }
   };
 
   const openEditModal = (project: Project) => {
@@ -83,11 +80,16 @@ export function ProjectsPage({
   return (
     <DashboardLayout
       notifications={notifications}
-      onMarkNotificationAsRead={onMarkNotificationAsRead}
+      onMarkNotificationAsRead={markAsRead}
     >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-900">Gestión de Obras</h2>
+          {error && (
+            <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm">
+              {error}
+            </div>
+          )}
           <button
             onClick={() => {
               setSelectedProject(null);
@@ -100,16 +102,26 @@ export function ProjectsPage({
           </button>
         </div>
 
-        <div className="grid gap-6">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onView={() => setViewingProject(project)}
-              onEdit={() => openEditModal(project)}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No hay obras registradas
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onView={() => setViewingProject(project)}
+                onEdit={() => openEditModal(project)}
+              />
+            ))}
+          </div>
+        )}
 
         <Modal
           isOpen={isModalOpen}
