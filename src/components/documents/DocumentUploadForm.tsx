@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Upload, X } from 'lucide-react';
-import type { DocumentType } from '../../types';
 import { DocumentService } from '../../services/documents';
+import { StorageService } from '../../services/storage';
+import type { DocumentType } from '../../types';
 
 interface DocumentUploadFormProps {
   workerId: string;
@@ -19,14 +20,20 @@ const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
 ];
 
 export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormProps) {
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedFile) {
       setError('Por favor seleccione un archivo');
+      return;
+    }
+
+    const validationError = StorageService.validateFile(selectedFile);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -46,7 +53,9 @@ export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormPr
       });
       onSuccess();
     } catch (err) {
-      setError('Error al subir el documento. Por favor intente nuevamente.');
+      const error = err instanceof Error ? err.message : 'Error al subir el documento';
+      setError(error);
+      console.error('Upload error:', err);
     } finally {
       setIsUploading(false);
     }
@@ -70,7 +79,7 @@ export function DocumentUploadForm({ workerId, onSuccess }: DocumentUploadFormPr
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" encType="multipart/form-data">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="type" className="block text-sm font-medium text-gray-700">
           Tipo de Documento

@@ -1,6 +1,8 @@
 import React from 'react';
-import { User } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 import { NotificationsPopover } from '../notifications/NotificationsPopover';
+import { RoleIndicator } from '../ui/RoleIndicator';
+import { AuthService } from '../../services/auth';
 import type { Notification } from '../../types';
 
 interface TopBarProps {
@@ -22,10 +24,16 @@ export function TopBar({ notifications, onMarkNotificationAsRead }: TopBarProps)
             onMarkAsRead={onMarkNotificationAsRead}
           />
           
-          <button className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-            <User className="w-5 h-5" />
-            <span className="text-sm">Administrador</span>
-          </button>
+          <div className="flex items-center space-x-4">
+            <RoleIndicator />
+            <button
+              onClick={() => AuthService.logout()}
+              className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </header>

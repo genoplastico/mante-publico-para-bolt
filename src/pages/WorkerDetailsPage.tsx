@@ -4,6 +4,7 @@ import { DocumentStatus } from '../components/documents/DocumentStatus';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { FileText, Upload, ArrowLeft } from 'lucide-react';
+import { DocumentUploadForm } from '../components/documents/DocumentUploadForm';
 import { DocumentService } from '../services/documents';
 import type { Worker, Document, DocumentType } from '../types';
 
@@ -25,15 +26,33 @@ interface WorkerDetailsPageProps {
 export function WorkerDetailsPage({ worker, onBack }: WorkerDetailsPageProps) {
   const [isUploadModalOpen, setIsUploadModalOpen] = React.useState(false);
   const [documents, setDocuments] = React.useState<Document[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const workerDocuments = DocumentService.getWorkerDocuments(worker.id);
-    setDocuments(workerDocuments.map(doc => DocumentService.updateDocumentStatus(doc)));
+    const loadDocuments = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const workerDocuments = await DocumentService.getWorkerDocuments(worker.id);
+        setDocuments(workerDocuments.map(doc => DocumentService.updateDocumentStatus(doc)));
+      } catch (error) {
+        console.error('Error loading documents:', error);
+        setError('Error al cargar los documentos');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadDocuments();
   }, [worker.id]);
 
-  const handleDocumentUpload = () => {
-    const updatedDocuments = DocumentService.getWorkerDocuments(worker.id);
-    setDocuments(updatedDocuments.map(doc => DocumentService.updateDocumentStatus(doc)));
+  const handleDocumentUpload = async () => {
+    try {
+      const updatedDocuments = await DocumentService.getWorkerDocuments(worker.id);
+      setDocuments(updatedDocuments.map(doc => DocumentService.updateDocumentStatus(doc)));
+    } catch (error) {
+      console.error('Error updating documents:', error);
+    }
     setIsUploadModalOpen(false);
   };
   
@@ -69,8 +88,13 @@ export function WorkerDetailsPage({ worker, onBack }: WorkerDetailsPageProps) {
           <div className="px-4 py-3 border-b">
             <h2 className="font-semibold text-gray-900">Documentos</h2>
           </div>
-          
-          {documents.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+            </div>
+          ) : error ? (
+            <div className="p-6 text-center text-red-600">{error}</div>
+          ) : documents.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 title="Sin documentos"

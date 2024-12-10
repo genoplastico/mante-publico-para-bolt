@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /documents/{workerId}/{fileName} {
+      function isAuthenticated() {
+        return request.auth != null;
+      }
+
+      function isValidFile() {
+        return request.resource.size <= 5 * 1024 * 1024
+          && (
+            request.resource.contentType.matches('application/pdf') ||
+            request.resource.contentType.matches('image/jpeg') ||
+            request.resource.contentType.matches('image/png')
+          );
+      }
+
+      function isSuperUser() {
+        return isAuthenticated() 
+          && get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'super';
+      }
+
+      // Permitir lectura a usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Permitir escritura solo a superusuarios con archivos válidos
+      allow write: if isAuthenticated();
+    }
+  }
+}

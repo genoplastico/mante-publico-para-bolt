@@ -1,7 +1,6 @@
 import { 
   collection,
   addDoc,
-  updateDoc,
   deleteDoc,
   doc,
   query,
@@ -9,13 +8,8 @@ import {
   getDocs,
   getDoc
 } from 'firebase/firestore';
-import { 
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
-} from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { db } from '../config/firebase';
+import { StorageService } from './storage';
 import type { Document, DocumentType, DocumentSearchQuery } from '../types';
 
 const DOCUMENT_METADATA = {
@@ -66,10 +60,17 @@ interface CreateDocumentParams {
 export class DocumentService {
   static async uploadDocument({ workerId, type, file, expiryDate }: CreateDocumentParams): Promise<Document> {
     try {
-      // Subir archivo a Firebase Storage
-      const storageRef = ref(storage, `documents/${workerId}/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
+      // Validar el archivo
+      const validationError = StorageService.validateFile(file);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
+      // Generate a unique path for the file
+      const filePath = StorageService.generateFilePath(workerId, file.name);
+      
+      // Upload file to Firebase Storage
+      const url = await StorageService.uploadFile(file, filePath);
 
       const metadata = DOCUMENT_METADATA[type];
     
@@ -105,7 +106,8 @@ export class DocumentService {
       const docRef = await addDoc(collection(db, 'documents'), documentData);
       return { id: docRef.id, ...documentData };
     } catch (error) {
-      throw new Error('Error al subir el documento');
+      console.error('Error uploading document:', error);
+      throw error instanceof Error ? error : new Error('Error al subir el documento');
     }
   }
 
@@ -150,9 +152,12 @@ export class DocumentService {
       if (docSnap.exists()) {
         const document = docSnap.data() as Document;
         
-        // Eliminar archivo de Storage
-        const storageRef = ref(storage, document.url);
-        await deleteObject(storageRef);
+        // Extract path from URL and delete file
+        const pathMatch = document.url.match(/documents%2F.+\?/);
+        if (pathMatch) {
+          const path = decodeURIComponent(pathMatch[0].replace('?', ''));
+          await StorageService.deleteFile(path);
+        }
         
         // Eliminar documento de Firestore
         await deleteDoc(docRef);

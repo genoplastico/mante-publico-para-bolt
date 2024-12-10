@@ -1,14 +1,11 @@
-import { 
+import {
   collection,
   doc,
   addDoc,
   updateDoc,
   deleteDoc,
   getDocs,
-  getDoc,
-  query,
-  where,
-  serverTimestamp
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Project } from '../types';
@@ -17,10 +14,13 @@ export class ProjectService {
   static async getProjects(): Promise<Project[]> {
     try {
       const querySnapshot = await getDocs(collection(db, 'projects'));
-      return querySnapshot.docs.map(doc => ({
+      const projects = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Project));
+      return projects.sort((a, b) => 
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
     } catch (error) {
       console.error('Error fetching projects:', error);
       throw new Error('No se pudieron obtener los proyectos');
@@ -29,10 +29,11 @@ export class ProjectService {
 
   static async createProject(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
+      const now = new Date().toISOString();
       const docRef = await addDoc(collection(db, 'projects'), {
         ...data,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: now,
+        updatedAt: now
       });
 
       const newDoc = await getDoc(docRef);
@@ -51,20 +52,11 @@ export class ProjectService {
       const projectRef = doc(db, 'projects', id);
       await updateDoc(projectRef, {
         ...data,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error updating project:', error);
       throw new Error('No se pudo actualizar el proyecto');
-    }
-  }
-
-  static async deleteProject(id: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, 'projects', id));
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      throw new Error('No se pudo eliminar el proyecto');
     }
   }
 
