@@ -23,8 +23,11 @@ service firebase.storage {
       // Permitir lectura a usuarios autenticados
       allow read: if isAuthenticated();
       
-      // Permitir escritura solo a superusuarios con archivos válidos
-      allow write: if isAuthenticated();
+      // Permitir escritura a usuarios autenticados con archivos válidos
+      allow write: if isAuthenticated() && isValidFile();
+      
+      // Permitir eliminación solo a superusuarios
+      allow delete: if isSuperUser();
     }
   }
 }
