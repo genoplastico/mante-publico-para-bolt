@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2, FileText } from 'lucide-react';
 import type { Worker } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface WorkersListProps {
   workers: Worker[];
@@ -35,6 +36,7 @@ interface WorkerCardProps {
 }
 
 function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
+  const { hasPermission } = useAuth();
   const expiredDocuments = worker.documents.filter(
     doc => doc.status === 'expired'
   ).length;
@@ -47,12 +49,13 @@ function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
           <p className="text-sm text-gray-500">CI: {worker.documentNumber}</p>
           
           <div className="mt-2 flex items-center space-x-4">
-            {expiredDocuments > 0 ? (
+            {expiredDocuments > 0 && (
               <span className="flex items-center text-red-600 text-sm">
                 <AlertCircle className="w-4 h-4 mr-1" />
                 {expiredDocuments} documentos vencidos
               </span>
-            ) : (
+            )}
+            {expiredDocuments === 0 && (
               <span className="flex items-center text-green-600 text-sm">
                 <CheckCircle2 className="w-4 h-4 mr-1" />
                 Documentación al día
@@ -61,13 +64,15 @@ function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
           </div>
         </div>
 
-        <button
-          onClick={onViewDetails}
-          className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-        >
-          <FileText className="w-4 h-4 mr-1.5" />
-          Ver documentos
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onViewDetails}
+            className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
+          >
+            <FileText className="w-4 h-4 mr-1.5" />
+            Ver documentos
+          </button>
+        </div>
       </div>
     </div>
   );

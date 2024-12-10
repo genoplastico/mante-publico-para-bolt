@@ -10,7 +10,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { StorageService } from './storage';
+import { AuthService } from './auth';
 import type { Document, DocumentType, DocumentSearchQuery } from '../types';
+
+import { WorkerService } from './workers';
 
 const DOCUMENT_METADATA = {
   carnet_salud: {
@@ -61,6 +64,10 @@ interface CreateDocumentParams {
 export class DocumentService {
   static async uploadDocument({ workerId, type, file, expiryDate, disableScaling }: CreateDocumentParams): Promise<Document> {
     try {
+      if (!AuthService.hasPermission('uploadDocument')) {
+        throw new Error('No tiene permisos para subir documentos');
+      }
+
       // Validar el archivo
       const validationError = StorageService.validateFile(file);
       if (validationError) {
@@ -147,6 +154,10 @@ export class DocumentService {
 
   static async deleteDocument(documentId: string): Promise<void> {
     try {
+      if (!AuthService.hasPermission('deleteDocument')) {
+        throw new Error('No tiene permisos para eliminar documentos');
+      }
+
       const docRef = doc(db, 'documents', documentId);
       const docSnap = await getDoc(docRef);
       
@@ -170,7 +181,20 @@ export class DocumentService {
 
   static async searchDocuments(query: string): Promise<Document[]> {
     try {
-      const querySnapshot = await getDocs(collection(db, 'documents'));
+      const user = AuthService.getCurrentUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      let documentsQuery = collection(db, 'documents');
+      
+      // Si es usuario secundario, filtrar por sus proyectos asignados
+      if (user.role === 'secondary' && user.projectIds?.length) {
+        documentsQuery = query(
+          documentsQuery,
+          where('projectId', 'in', user.projectIds)
+        );
+      }
+      
+      const querySnapshot = await getDocs(documentsQuery);
       const documents = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -192,6 +216,102 @@ export class DocumentService {
       });
     } catch (error) {
       throw new Error('Error al buscar documentos');
+    }
+  }
+
+  static async getDashboardStats(): Promise<{
+    totalDocuments: number;
+    expiringDocuments: number;
+    expiredDocuments: number;
+    validDocuments: number;
+    documentsByType: Record<DocumentType, number>;
+    upcomingExpirations: Array<{
+      document: Document;
+      daysUntilExpiry: number;
+      workerName?: string;
+    }>;
+  }> {
+    try {
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      let documentsQuery = collection(db, 'documents');
+      
+      // Si es usuario secundario, filtrar por sus proyectos asignados
+      if (user.role === 'secondary' && user.projectIds?.length) {
+        documentsQuery = query(
+          documentsQuery,
+          where('projectId', 'in', user.projectIds)
+        );
+      }
+      
+      const [querySnapshot, workers] = await Promise.all([
+        getDocs(documentsQuery),
+        WorkerService.getWorkers()
+      ]);
+
+      const documents = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Document));
+
+      const workerMap = new Map(workers.map(w => [w.id, w]));
+      const now = new Date();
+      
+      const stats = {
+        totalDocuments: documents.length,
+        expiringDocuments: 0,
+        expiredDocuments: 0,
+        validDocuments: 0,
+        documentsByType: {} as Record<DocumentType, number>,
+        upcomingExpirations: []
+      };
+      
+      documents.forEach(doc => {
+        // Actualizar estado del documento
+        const updatedDoc = this.updateDocumentStatus(doc);
+        doc.status = updatedDoc.status;
+
+        if (doc.expiryDate) {
+          const expiryDate = new Date(doc.expiryDate);
+          const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilExpiry > 0 && daysUntilExpiry <= 15) {
+            stats.upcomingExpirations.push({
+              document: doc,
+              daysUntilExpiry,
+              workerName: doc.workerId ? workerMap.get(doc.workerId)?.name : undefined
+            });
+          }
+        }
+
+        // Contar por estado
+        switch (doc.status) {
+          case 'expired':
+            stats.expiredDocuments++;
+            break;
+          case 'expiring_soon':
+            stats.expiringDocuments++;
+            break;
+          case 'valid':
+            stats.validDocuments++;
+            break;
+        }
+        
+        // Contar por tipo
+        stats.documentsByType[doc.type] = (stats.documentsByType[doc.type] || 0) + 1;
+      });
+      
+      // Ordenar por días hasta vencimiento
+      stats.upcomingExpirations.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+      
+      return stats;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Error desconocido');
+      console.error('Error getting dashboard stats:', err);
+      throw err;
     }
   }
 

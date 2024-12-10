@@ -1,9 +1,11 @@
 import React from 'react';
 import { Shield, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import type { UserPermissions } from '../../types';
 
 export function RoleIndicator() {
-  const { isSuperUser } = useAuth();
+  const { hasPermission } = useAuth();
+  const isSuperUser = hasPermission('manageUsers');
 
   return (
     <div className={`inline-flex items-center px-2 py-1 rounded-full text-sm ${

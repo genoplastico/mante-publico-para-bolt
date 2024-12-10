@@ -5,19 +5,35 @@ import {
   getDocs,
   getDoc,
   query,
-  where
+  where,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { AuthService } from './auth';
 import type { Worker } from '../types';
 
 export class WorkerService {
   static async getWorkers(projectId?: string): Promise<Worker[]> {
     try {
-      let q = collection(db, 'workers');
-      if (projectId) {
-        q = query(q, where('projectIds', 'array-contains', projectId));
+      const user = AuthService.getCurrentUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      let workersQuery = collection(db, 'workers');
+      
+      // Si es usuario secundario, filtrar por sus proyectos asignados
+      if (user.role === 'secondary' && user.projectIds?.length > 0) {
+        workersQuery = query(
+          workersQuery,
+          where('projectIds', 'array-contains-any', user.projectIds)
+        );
+      } else if (projectId) {
+        workersQuery = query(
+          workersQuery,
+          where('projectIds', 'array-contains', projectId)
+        );
       }
-      const querySnapshot = await getDocs(q);
+      
+      const querySnapshot = await getDocs(workersQuery);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -30,6 +46,10 @@ export class WorkerService {
 
   static async createWorker(data: Omit<Worker, 'id' | 'documents'>): Promise<Worker> {
     try {
+      if (!AuthService.hasPermission('createWorker')) {
+        throw new Error('No tiene permisos para crear operarios');
+      }
+
       const now = new Date().toISOString();
       const docRef = await addDoc(collection(db, 'workers'), {
         ...data,
@@ -51,13 +71,17 @@ export class WorkerService {
 
   static async updateWorker(id: string, data: Partial<Omit<Worker, 'id'>>): Promise<void> {
     try {
+      if (!AuthService.hasPermission('editWorker')) {
+        throw new Error('No tiene permisos para editar operarios');
+      }
+
       await updateDoc(doc(db, 'workers', id), {
         ...data,
         updatedAt: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error updating worker:', error);
-      throw new Error('No se pudo actualizar el operario');
+      throw error instanceof Error ? error : new Error('No se pudo actualizar el operario');
     }
   }
 }

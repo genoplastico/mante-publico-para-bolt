@@ -4,11 +4,13 @@ import { Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import type { Project } from '../types';
+import { useAuth } from '../hooks/useAuth';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { ProjectDetailsPage } from './ProjectDetailsPage';
 import { ProjectService } from '../services/projects';
 
 export function ProjectsPage() {
+  const { hasPermission } = useAuth();
   const { notifications, markAsRead } = useNotificationsContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -28,8 +30,9 @@ export function ProjectsPage() {
       const fetchedProjects = await ProjectService.getProjects();
       setProjects(fetchedProjects);
     } catch (err) {
-      setError('Error al cargar los proyectos');
-      console.error(err);
+      const error = err instanceof Error ? err.message : 'Error al cargar los proyectos';
+      console.error('Error loading projects:', err);
+      setError(error);
     } finally {
       setIsLoading(false);
     }
@@ -37,6 +40,9 @@ export function ProjectsPage() {
 
   const handleCreateProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      if (!hasPermission('createProject')) {
+        throw new Error('No tiene permisos para crear proyectos');
+      }
       const newProject = await ProjectService.createProject(data);
       setProjects(prev => [...prev, newProject]);
       setIsModalOpen(false);
@@ -48,6 +54,9 @@ export function ProjectsPage() {
   const handleEditProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       if (!selectedProject) return;
+      if (!hasPermission('editProject')) {
+        throw new Error('No tiene permisos para editar proyectos');
+      }
       await ProjectService.updateProject(selectedProject.id, data);
       setProjects(prev =>
         prev.map(project =>
@@ -90,16 +99,18 @@ export function ProjectsPage() {
               {error}
             </div>
           )}
-          <button
-            onClick={() => {
-              setSelectedProject(null);
-              setIsModalOpen(true);
-            }}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nueva Obra
-          </button>
+          {hasPermission('createProject') && (
+            <button
+              onClick={() => {
+                setSelectedProject(null);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Nueva Obra
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -148,6 +159,9 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ project, onEdit, onView }: ProjectCardProps) {
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('editProject');
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       <div className="flex items-start justify-between">
@@ -175,15 +189,19 @@ function ProjectCard({ project, onEdit, onView }: ProjectCardProps) {
           <button
             onClick={onView}
             className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+            title="Ver detalles de la obra"
           >
             Ver detalles
           </button>
-          <button
-            onClick={onEdit}
-            className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 rounded"
-          >
-            Editar
-          </button>
+          {canEdit && (
+            <button
+              onClick={onEdit}
+              className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 rounded"
+              title="Editar obra"
+            >
+              Editar
+            </button>
+          )}
         </div>
       </div>
     </div>

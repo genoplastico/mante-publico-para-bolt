@@ -5,7 +5,34 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import type { User, FirebaseUser } from '../types';
+import type { User, FirebaseUser, UserRole, UserPermissions } from '../types';
+
+const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
+  super: {
+    createProject: true,
+    editProject: true,
+    deleteProject: true,
+    uploadDocument: true,
+    deleteDocument: true,
+    createWorker: true,
+    editWorker: true,
+    viewAllProjects: true,
+    assignWorkers: true,
+    manageUsers: true
+  },
+  secondary: {
+    createProject: false,
+    editProject: false,
+    deleteProject: false,
+    uploadDocument: false,
+    deleteDocument: false,
+    createWorker: false,
+    editWorker: false,
+    viewAllProjects: false,
+    assignWorkers: false,
+    manageUsers: false
+  }
+};
 
 interface LoginCredentials {
   email: string;
@@ -18,7 +45,7 @@ export class AuthService {
   static async login({ email, password }: LoginCredentials): Promise<User> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       if (!userCredential.user.email) {
         throw new Error('El correo electrónico es requerido');
       }
@@ -30,7 +57,7 @@ export class AuthService {
         const newUser: FirebaseUser = {
           name: email.split('@')[0],
           role: 'secondary',
-          projectIds: []
+          projectIds: [] // Usuario nuevo sin proyectos asignados
         };
         
         await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
@@ -100,8 +127,15 @@ export class AuthService {
     return this.currentUser !== null;
   }
 
-  static hasPermission(permission: 'create_project' | 'edit_project' | 'upload_document'): boolean {
-    if (!this.currentUser) return false;
-    return this.currentUser.role === 'super';
+  static hasPermission(permission: keyof UserPermissions): boolean {
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    return ROLE_PERMISSIONS[user.role][permission];
+  }
+
+  static getUserPermissions(): UserPermissions | null {
+    const user = this.getCurrentUser();
+    if (!user) return null;
+    return ROLE_PERMISSIONS[user.role];
   }
 }

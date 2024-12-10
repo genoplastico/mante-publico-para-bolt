@@ -2,13 +2,28 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'super' | 'secondary';
+  role: UserRole;
   projectIds?: string[];
+}
+
+export type UserRole = 'super' | 'secondary';
+
+export interface UserPermissions {
+  createProject: boolean;
+  editProject: boolean;
+  deleteProject: boolean;
+  uploadDocument: boolean;
+  deleteDocument: boolean;
+  createWorker: boolean;
+  editWorker: boolean;
+  viewAllProjects: boolean;
+  assignWorkers: boolean;
+  manageUsers: boolean;
 }
 
 export interface FirebaseUser {
   name: string;
-  role: 'super' | 'secondary';
+  role: UserRole;
   projectIds?: string[];
 }
 

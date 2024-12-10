@@ -2,7 +2,7 @@ import React from 'react';
 import { FileText, Download, Trash2 } from 'lucide-react';
 import { DocumentStatus } from './DocumentStatus';
 import type { Document } from '../../types';
-import { AuthService } from '../../services/auth';
+import { useAuth } from '../../hooks/useAuth';
 
 interface DocumentListProps {
   documents: Document[];
@@ -10,7 +10,8 @@ interface DocumentListProps {
 }
 
 export function DocumentList({ documents, onDelete }: DocumentListProps) {
-  const canDelete = AuthService.hasPermission('upload_document');
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission('deleteDocument');
 
   if (documents.length === 0) {
     return (

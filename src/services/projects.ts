@@ -1,6 +1,9 @@
 import {
   collection,
   doc,
+  documentId,
+  query,
+  where,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -8,27 +11,55 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { AuthService } from './auth';
 import type { Project } from '../types';
 
 export class ProjectService {
   static async getProjects(): Promise<Project[]> {
     try {
-      const querySnapshot = await getDocs(collection(db, 'projects'));
-      const projects = querySnapshot.docs.map(doc => ({
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      let projectsQuery = collection(db, 'projects');
+      
+      // Si es usuario secundario, filtrar por sus proyectos asignados
+      if (user.role === 'secondary' && user.projectIds?.length > 0) {
+        projectsQuery = query(
+          collection(db, 'projects'),
+          where(documentId(), 'in', user.projectIds || [])
+        );
+        const querySnapshot = await getDocs(projectsQuery);
+        const projects = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Project));
+        return projects.sort((a, b) => 
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      }
+      
+      const querySnapshot = await getDocs(projectsQuery);
+      return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      } as Project));
-      return projects.sort((a, b) => 
+      } as Project)).sort((a, b) => 
         new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       );
     } catch (error) {
-      console.error('Error fetching projects:', error);
-      throw new Error('No se pudieron obtener los proyectos');
+      const err = error instanceof Error ? error : new Error('Error desconocido');
+      console.error('Error fetching projects:', err);
+      throw err;
     }
   }
 
   static async createProject(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
+      if (!AuthService.hasPermission('createProject')) {
+        throw new Error('No tiene permisos para crear proyectos');
+      }
+
       const now = new Date().toISOString();
       const docRef = await addDoc(collection(db, 'projects'), {
         ...data,
@@ -49,6 +80,10 @@ export class ProjectService {
 
   static async updateProject(id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>): Promise<void> {
     try {
+      if (!AuthService.hasPermission('editProject')) {
+        throw new Error('No tiene permisos para editar proyectos');
+      }
+
       const projectRef = doc(db, 'projects', id);
       await updateDoc(projectRef, {
         ...data,

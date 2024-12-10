@@ -1,23 +1,29 @@
 import React from 'react';
-import { Building2, Users, FileText, Home, Settings } from 'lucide-react';
+import { Building2, Users, FileText, Home, Settings, UserCog } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
-const MENU_ITEMS = [
+const getMenuItems = (hasManageUsersPermission: boolean) => [
   { path: '/', icon: <Home />, label: 'Panel Principal' },
   { path: '/projects', icon: <Building2 />, label: 'Obras' },
   { path: '/workers', icon: <Users />, label: 'Operarios' },
   { path: '/documents', icon: <FileText />, label: 'Documentos' },
+  ...(hasManageUsersPermission ? [
+    { path: '/users', icon: <UserCog />, label: 'Usuarios' }
+  ] : []),
   { path: '/settings', icon: <Settings />, label: 'Configuración' }
 ];
 
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission } = useAuth();
+  const menuItems = getMenuItems(hasPermission('manageUsers'));
 
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-200">
       <nav className="p-4 space-y-2">
-        {MENU_ITEMS.map((item) => (
+        {menuItems.map((item) => (
           <SidebarItem
             key={item.path}
             icon={item.icon}
