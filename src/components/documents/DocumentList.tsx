@@ -2,6 +2,8 @@ import React from 'react';
 import { FileText, Download, Trash2 } from 'lucide-react';
 import { DocumentStatus } from './DocumentStatus';
 import type { Document } from '../../types';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useAuth } from '../../hooks/useAuth';
 
 interface DocumentListProps {
@@ -34,15 +36,15 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center">
                   <FileText className="h-5 w-5 text-gray-400" />
-                  <div className="ml-4">
+                  <div className="ml-4 flex-1">
                     <p className="font-medium text-gray-900">{document.name}</p>
                     <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
                       <span>
-                        Subido el {new Date(document.uploadedAt).toLocaleDateString('es-ES')}
+                        Subido el {format(new Date(document.uploadedAt), "d 'de' MMMM 'de' yyyy", { locale: es })}
                       </span>
                       {document.expiryDate && (
                         <span>
-                          · Vence el {new Date(document.expiryDate).toLocaleDateString('es-ES')}
+                          · Vence el {format(new Date(document.expiryDate), "d 'de' MMMM 'de' yyyy", { locale: es })}
                         </span>
                       )}
                     </div>
@@ -50,13 +52,13 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
                 </div>
               </div>
 
-              <div className="ml-4 flex items-center space-x-4">
+              <div className="ml-4 flex items-center gap-4">
                 <DocumentStatus document={document} />
                 
                 <a
                   href={document.url}
                   download={document.name}
-                  className="text-gray-400 hover:text-gray-500"
+                  className="text-gray-400 hover:text-gray-500 transition-colors"
                   title="Descargar"
                 >
                   <Download className="h-5 w-5" />
@@ -65,7 +67,7 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
                 {canDelete && onDelete && (
                   <button
                     onClick={() => onDelete(document.id)}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-400 hover:text-red-500 transition-colors"
                     title="Eliminar"
                   >
                     <Trash2 className="h-5 w-5" />

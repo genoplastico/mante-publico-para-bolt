@@ -1,19 +1,19 @@
 import { 
-  collection,
-  addDoc,
-  deleteDoc,
-  doc,
-  query,
-  where,
-  getDocs,
-  getDoc
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  getDocs, 
+  getDoc 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { StorageService } from './storage';
 import { AuthService } from './auth';
-import type { Document, DocumentType, DocumentSearchQuery } from '../types';
-
 import { WorkerService } from './workers';
+import { createNotification } from './notifications';
+import type { Document, DocumentType, DocumentSearchQuery, DocumentStatus } from '../types';
 
 const DOCUMENT_METADATA = {
   carnet_salud: {
@@ -68,51 +68,60 @@ export class DocumentService {
         throw new Error('No tiene permisos para subir documentos');
       }
 
-      // Validar el archivo
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      // Validaciones iniciales
       const validationError = StorageService.validateFile(file);
       if (validationError) {
         throw new Error(validationError);
       }
 
-      // Generate a unique path for the file
+      // Subir archivo
       const filePath = StorageService.generateFilePath(workerId, file.name);
-      
-      // Upload file to Firebase Storage
       const url = await StorageService.uploadFile(file, filePath, { disableScaling });
 
+      // Preparar metadata
       const metadata = DOCUMENT_METADATA[type];
+      const now = new Date().toISOString();
     
       const documentData: Omit<Document, 'id'> = {
         type,
         name: file.name,
         url,
         status: 'valid',
-        uploadedAt: new Date().toISOString(),
+        uploadedAt: now,
         expiryDate,
         workerId,
         metadata: {
           description: metadata.description,
           keywords: metadata.keywords,
           category: metadata.category,
-          lastModified: new Date().toISOString(),
-          modifiedBy: 'system',
+          lastModified: now,
+          modifiedBy: user.id,
           version: 1,
           tags: [metadata.category],
         },
         auditLog: {
-          createdAt: new Date().toISOString(),
-          createdBy: 'system',
+          createdAt: now,
+          createdBy: user.id,
           actions: [{
             type: 'create',
-            timestamp: new Date().toISOString(),
-            userId: 'system',
+            timestamp: now,
+            userId: user.id,
             details: `Documento ${type} creado para el trabajador ${workerId}`
           }]
         }
       };
 
+      // Crear documento en Firestore
       const docRef = await addDoc(collection(db, 'documents'), documentData);
-      return { id: docRef.id, ...documentData };
+      const newDocument = { id: docRef.id, ...documentData };
+
+      // Actualizar estado inicial
+      return this.updateDocumentStatus(newDocument);
     } catch (error) {
       console.error('Error uploading document:', error);
       throw error instanceof Error ? error : new Error('Error al subir el documento');
@@ -142,14 +151,49 @@ export class DocumentService {
     const expiryDate = new Date(document.expiryDate);
     const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    let status: Document['status'] = 'valid';
+    let newStatus: DocumentStatus = 'valid';
     if (daysUntilExpiry <= 0) {
-      status = 'expired';
-    } else if (daysUntilExpiry <= 7) {
-      status = 'expiring_soon';
+      newStatus = 'expired';
+    } else if (daysUntilExpiry <= 15) {
+      newStatus = 'expiring_soon';
     }
 
-    return { ...document, status };
+    // Si el estado ha cambiado, crear una notificación
+    if (newStatus !== document.status) {
+      const user = AuthService.getCurrentUser();
+      if (user) {
+        void this.createStatusChangeNotification(document, newStatus, daysUntilExpiry, user.id);
+      }
+    }
+
+    return { ...document, status: newStatus };
+  }
+
+  private static async createStatusChangeNotification(
+    document: Document,
+    newStatus: DocumentStatus,
+    daysUntilExpiry: number,
+    userId: string
+  ): Promise<void> {
+    try {
+      const notificationData = {
+        type: newStatus === 'expired' ? 'document_expired' : 'document_expiring',
+        title: newStatus === 'expired' ? 'Documento Vencido' : 'Documento por Vencer',
+        message: newStatus === 'expired'
+          ? `El documento ${document.name} ha vencido`
+          : `El documento ${document.name} vencerá en ${daysUntilExpiry} días`,
+        metadata: {
+          documentId: document.id,
+          workerId: document.workerId,
+          projectId: document.projectId
+        },
+        userId
+      };
+
+      await createNotification(notificationData);
+    } catch (error) {
+      console.error('Error creating status change notification:', error);
+    }
   }
 
   static async deleteDocument(documentId: string): Promise<void> {
@@ -164,14 +208,12 @@ export class DocumentService {
       if (docSnap.exists()) {
         const document = docSnap.data() as Document;
         
-        // Extract path from URL and delete file
         const pathMatch = document.url.match(/documents%2F.+\?/);
         if (pathMatch) {
           const path = decodeURIComponent(pathMatch[0].replace('?', ''));
           await StorageService.deleteFile(path);
         }
         
-        // Eliminar documento de Firestore
         await deleteDoc(docRef);
       }
     } catch (error) {
@@ -186,7 +228,6 @@ export class DocumentService {
 
       let documentsQuery = collection(db, 'documents');
       
-      // Si es usuario secundario, filtrar por sus proyectos asignados
       if (user.role === 'secondary' && user.projectIds?.length) {
         documentsQuery = query(
           documentsQuery,
@@ -237,18 +278,15 @@ export class DocumentService {
         throw new Error('Usuario no autenticado');
       }
 
-      // Obtener los trabajadores según los permisos del usuario
       const workers = await WorkerService.getWorkers();
       const workerIds = workers.map(w => w.id);
       
-      // Consultar documentos solo de los trabajadores permitidos
       const documentsQuery = query(
         collection(db, 'documents'),
         where('workerId', 'in', workerIds)
       );
       
       const querySnapshot = await getDocs(documentsQuery);
-
       const documents = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -263,11 +301,14 @@ export class DocumentService {
         expiredDocuments: 0,
         validDocuments: 0,
         documentsByType: {} as Record<DocumentType, number>,
-        upcomingExpirations: []
+        upcomingExpirations: [] as Array<{
+          document: Document;
+          daysUntilExpiry: number;
+          workerName?: string;
+        }>
       };
       
       documents.forEach(doc => {
-        // Actualizar estado del documento
         const updatedDoc = this.updateDocumentStatus(doc);
         doc.status = updatedDoc.status;
 
@@ -284,7 +325,6 @@ export class DocumentService {
           }
         }
 
-        // Contar por estado
         switch (doc.status) {
           case 'expired':
             stats.expiredDocuments++;
@@ -297,11 +337,9 @@ export class DocumentService {
             break;
         }
         
-        // Contar por tipo
         stats.documentsByType[doc.type] = (stats.documentsByType[doc.type] || 0) + 1;
       });
       
-      // Ordenar por días hasta vencimiento
       stats.upcomingExpirations.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
       
       return stats;
@@ -316,7 +354,6 @@ export class DocumentService {
     try {
       let q = query(collection(db, 'documents'));
       
-      // Aplicar filtros
       if (query.filters?.type?.length) {
         q = query(q, where('type', 'in', query.filters.type));
       }
@@ -331,7 +368,6 @@ export class DocumentService {
         ...doc.data()
       } as Document));
       
-      // Filtros adicionales que no se pueden hacer directamente en la consulta
       if (query.text) {
         const normalizedQuery = query.text.toLowerCase();
         documents = documents.filter(doc => {
