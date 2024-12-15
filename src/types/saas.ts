@@ -6,6 +6,16 @@ export interface SaasAdmin {
   name: string;
 }
 
+export interface SaasConfig {
+  ownerConfigured: boolean;
+  setupDate: string | null;
+  features: {
+    maxInvitesPerProject: number;
+    inviteExpirationDays: number;
+    maxFileSize: number;
+  };
+}
+
 export interface SaasMetrics {
   totalSubscribers: number;
   totalWorkers: number;

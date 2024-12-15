@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate } from 'react-router-dom';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/DocumentsPage';
@@ -12,6 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AuthService } from './services/auth';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
+import { AppRoutes } from './routes';
 import type { AuthState } from './types/auth';
 
 function App() {
@@ -52,22 +53,9 @@ function App() {
   if (!authState.isAuthenticated) {
     return (
       <ErrorBoundary>
-        <LoginPage onLogin={handleLogin} />
-      </ErrorBoundary>
-    );
-  }
-
-  // Redirigir a la página de configuración si no hay owner configurado
-  if (authState.user?.role === 'owner' && window.location.pathname !== '/admin/setup') {
-    return <Navigate to="/admin/setup" replace />;
-  }
-
-  // Mostrar pantalla de bienvenida para usuarios sin proyectos asignados
-  if ((authState.user?.role === 'viewer' || authState.user?.role === 'collaborator') && 
-      (!authState.user.projectIds || authState.user.projectIds.length === 0)) {
-    return (
-      <ErrorBoundary>
-        <WelcomeScreen />
+        <BrowserRouter>
+          <LoginPage onLogin={handleLogin} />
+        </BrowserRouter>
       </ErrorBoundary>
     );
   }
@@ -75,25 +63,7 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <Routes>
-          {authState.user?.role === 'owner' || authState.user?.role === 'support' ? (
-            <>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/setup" element={<SetupPage />} />
-              <Route path="*" element={<Navigate to="/admin" replace />} />
-            </>
-          ) : (
-            <>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/workers" element={<WorkersPage />} />
-              <Route path="/documents" element={<DocumentsPage />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </>
-          )}
-        </Routes>
+        <AppRoutes user={authState.user} />
       </BrowserRouter>
     </ErrorBoundary>
   );

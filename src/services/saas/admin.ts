@@ -1,63 +1,100 @@
-import { collection, query, getDocs, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { SaasMetrics, Organization, PaymentHistory } from '../../types';
+import type { SaasAdmin, SaasMetrics } from '../../types/saas';
+import { COLLECTIONS } from './constants';
 
 export class SaasAdminService {
   static async getMetrics(): Promise<SaasMetrics> {
     try {
       // Obtener total de suscriptores (organizaciones)
-      const orgsSnapshot = await getDocs(collection(db, 'organizations'));
-      const totalSubscribers = orgsSnapshot.size;
+      let totalSubscribers = 0;
+      try {
+        const orgsSnapshot = await getDocs(collection(db, COLLECTIONS.ORGANIZATIONS));
+        totalSubscribers = orgsSnapshot.size;
+      } catch (e) {
+        console.warn('Organizations collection not found');
+      }
 
       // Obtener total de trabajadores
-      const workersSnapshot = await getDocs(collection(db, 'workers'));
-      const totalWorkers = workersSnapshot.size;
+      let totalWorkers = 0;
+      try {
+        const workersSnapshot = await getDocs(collection(db, COLLECTIONS.WORKERS));
+        totalWorkers = workersSnapshot.size;
+      } catch (e) {
+        console.warn('Workers collection not found');
+      }
 
       // Obtener pagos del mes actual
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      let monthlyRevenue = 0;
+      try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
 
-      const paymentsQuery = query(
-        collection(db, 'payments'),
-        where('status', '==', 'success'),
-        where('createdAt', '>=', startOfMonth.toISOString())
-      );
-      
-      const paymentsSnapshot = await getDocs(paymentsQuery);
-      const monthlyRevenue = paymentsSnapshot.docs.reduce(
-        (total, doc) => total + (doc.data() as PaymentHistory).amount,
-        0
-      );
+        const paymentsQuery = query(
+          collection(db, COLLECTIONS.PAYMENTS),
+          where('status', '==', 'success'),
+          where('createdAt', '>=', startOfMonth.toISOString())
+        );
+        
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        monthlyRevenue = paymentsSnapshot.docs.reduce(
+          (total, doc) => total + doc.data().amount,
+          0
+        );
+      } catch (e) {
+        console.warn('Payments collection not found');
+      }
 
       // Obtener suscripciones activas
-      const activeOrgsQuery = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'active')
-      );
-      const activeOrgsSnapshot = await getDocs(activeOrgsQuery);
+      let activeSubscriptions = 0;
+      try {
+        const activeOrgsQuery = query(
+          collection(db, COLLECTIONS.ORGANIZATIONS),
+          where('status', '==', 'active')
+        );
+        const activeOrgsSnapshot = await getDocs(activeOrgsQuery);
+        activeSubscriptions = activeOrgsSnapshot.size;
+      } catch (e) {
+        console.warn('Organizations collection not found');
+      }
 
       return {
         totalSubscribers,
         totalWorkers,
         monthlyRevenue,
-        activeSubscriptions: activeOrgsSnapshot.size
+        activeSubscriptions
       };
     } catch (error) {
       console.error('Error getting SaaS metrics:', error);
-      throw error;
+      return {
+        totalSubscribers: 0,
+        totalWorkers: 0,
+        monthlyRevenue: 0,
+        activeSubscriptions: 0
+      };
     }
   }
 
-  static async getSubscribersList(): Promise<Organization[]> {
+  static async promoteToOwner(userId: string, email: string, name: string): Promise<void> {
     try {
-      const snapshot = await getDocs(collection(db, 'organizations'));
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Organization));
+      // Verificar si el usuario ya es admin
+      const adminDoc = await getDoc(doc(db, 'saas_admins', userId));
+      if (adminDoc.exists()) {
+        throw new Error('El usuario ya es administrador');
+      }
+
+      // Crear documento de admin
+      const adminData: SaasAdmin = {
+        id: userId,
+        email,
+        name,
+        role: 'owner'
+      };
+
+      await setDoc(doc(db, 'saas_admins', userId), adminData);
     } catch (error) {
-      console.error('Error getting subscribers list:', error);
+      console.error('Error promoting to owner:', error);
       throw error;
     }
   }

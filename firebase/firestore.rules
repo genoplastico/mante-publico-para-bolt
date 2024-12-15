@@ -5,6 +5,11 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    function isFirstUser() {
+      return !exists(/databases/$(database)/documents/saas_config/setup) ||
+             !get(/databases/$(database)/documents/saas_config/setup).data.ownerConfigured;
+    }
     
     function isOwner() {
       return isAuthenticated() && 
@@ -21,6 +26,25 @@ service cloud.firestore {
     function belongsToOrg(orgId) {
       return isAuthenticated() && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == orgId;
+    }
+
+    // Reglas para saas_admins
+    match /saas_admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner() || (isFirstUser() && request.auth.uid == adminId);
+    }
+
+    // Reglas para saas_config
+    match /saas_config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner() || isFirstUser();
+    }
+
+    // Reglas para ownership_requests
+    match /ownership_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == requestId;
+      allow update: if isOwner();
     }
 
     // Reglas para colecciones
@@ -50,8 +74,8 @@ service cloud.firestore {
     }
     
     match /saas_admins/{adminId} {
-      allow read: if isOwner() || isSupport();
-      allow write: if isOwner();
+      allow read: if isAuthenticated();
+      allow write: if isOwner() || (isFirstUser() && request.auth.uid == adminId);
     }
     
     match /plans/{planId} {

@@ -19,9 +19,13 @@ export function AdminDashboard() {
       setIsLoading(true);
       const data = await SaasAdminService.getMetrics();
       setMetrics(data);
+      setError(null);
     } catch (error) {
       console.error('Error loading metrics:', error);
-      setError('Error al cargar las métricas');
+      // No mostrar error si tenemos métricas
+      if (!metrics) {
+        setError('Error al cargar las métricas. Por favor, intente nuevamente.');
+      }
     } finally {
       setIsLoading(false);
     }

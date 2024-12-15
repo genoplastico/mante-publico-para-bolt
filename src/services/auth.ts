@@ -1,12 +1,12 @@
 import { 
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { AuthUser, SaasRole, UserPermissions, SaasAdmin } from '../types/auth';
-import { setDoc } from 'firebase/firestore';
+import { INITIAL_SAAS_CONFIG } from './saas/constants';
 
 const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
   owner: {
@@ -87,12 +87,9 @@ export class AuthService {
   static async login({ email, password }: LoginCredentials): Promise<AuthUser> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-      if (!userCredential.user.email) {
-        throw new Error('El correo electrónico es requerido');
-      }
-
-      // Verificar si es admin del SaaS
+      
+      
+      // Primero verificar si es admin del SaaS
       const adminDoc = await getDoc(doc(db, 'saas_admins', userCredential.user.uid));
       if (adminDoc.exists()) {
         const adminData = adminDoc.data() as SaasAdmin;
@@ -108,14 +105,46 @@ export class AuthService {
       // Si no es admin, buscar en usuarios normales
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       if (!userDoc.exists()) {
+        // Verificar si hay algún owner configurado
+        const configDoc = await getDoc(doc(db, 'saas_config', 'setup'));
+        const isFirstUser = !configDoc.exists() || !configDoc.data()?.ownerConfigured;
+
         const newUser: AuthUser = {
           name: email.split('@')[0],
-          role: 'viewer',
+          role: isFirstUser ? 'owner' : 'viewer',
           id: userCredential.user.uid,
           email: userCredential.user.email!
         };
         
-        await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+        if (isFirstUser) {
+          // Si es el primer usuario, crearlo como admin
+          const batch = writeBatch(db);
+          
+          const adminData: SaasAdmin = {
+            id: userCredential.user.uid,
+            email: userCredential.user.email!,
+            name: newUser.name,
+            role: 'owner'
+          };
+          
+          // Configurar el SaaS
+          batch.set(doc(db, 'saas_config', 'setup'), {
+            ownerConfigured: true,
+            setupDate: new Date().toISOString(),
+            features: INITIAL_SAAS_CONFIG.features
+          });
+          
+          // Crear admin
+          batch.set(doc(db, 'saas_admins', userCredential.user.uid), adminData);
+          
+          await batch.commit();
+        }
+        
+        if (!isFirstUser) {
+          // Si no es el primer usuario, crearlo como usuario normal
+          await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+        }
+
         return newUser;
       }
 
@@ -152,19 +181,33 @@ export class AuthService {
   static initAuthListener(callback: (user: AuthUser | null) => void): () => void {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as AuthUser;
+        // Primero verificar si es admin
+        const adminDoc = await getDoc(doc(db, 'saas_admins', firebaseUser.uid));
+        if (adminDoc.exists()) {
+          const adminData = adminDoc.data() as SaasAdmin;
           const user: AuthUser = {
             id: firebaseUser.uid,
             email: firebaseUser.email!,
-            name: userData.name,
-            role: userData.role,
-            projectIds: userData.projectIds,
-            organizationId: userData.organizationId
+            name: adminData.name,
+            role: adminData.role
           };
           this.currentUser = user;
           callback(user);
+        } else {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as AuthUser;
+            const user: AuthUser = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email!,
+              name: userData.name,
+              role: userData.role,
+              projectIds: userData.projectIds,
+              organizationId: userData.organizationId
+            };
+            this.currentUser = user;
+            callback(user);
+          }
         }
       } else {
         this.currentUser = null;
