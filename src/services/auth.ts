@@ -5,7 +5,8 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import type { AuthUser, SaasRole, UserPermissions } from '../types/auth';
+import type { AuthUser, SaasRole, UserPermissions, SaasAdmin } from '../types/auth';
+import { setDoc } from 'firebase/firestore';
 
 const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
   owner: {
@@ -18,7 +19,8 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     editWorker: true,
     viewAllProjects: true,
     assignWorkers: true,
-    manageUsers: true
+    manageUsers: true,
+    viewMetrics: true
   },
   support: {
     createProject: false,
@@ -30,7 +32,8 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     editWorker: false,
     viewAllProjects: true,
     assignWorkers: false,
-    manageUsers: false
+    manageUsers: false,
+    viewMetrics: true
   },
   subscriber: {
     createProject: true,
@@ -42,7 +45,8 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     editWorker: true,
     viewAllProjects: true,
     assignWorkers: true,
-    manageUsers: true
+    manageUsers: true,
+    viewMetrics: false
   },
   viewer: {
     createProject: false,
@@ -54,7 +58,8 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     editWorker: false,
     viewAllProjects: false,
     assignWorkers: false,
-    manageUsers: false
+    manageUsers: false,
+    viewMetrics: false
   },
   collaborator: {
     createProject: false,
@@ -66,7 +71,8 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     editWorker: true,
     viewAllProjects: false,
     assignWorkers: false,
-    manageUsers: false
+    manageUsers: false,
+    viewMetrics: false
   },
 };
 
@@ -78,7 +84,7 @@ interface LoginCredentials {
 export class AuthService {
   private static currentUser: AuthUser | null = null;
 
-  static async login({ email, password }: LoginCredentials): Promise<User> {
+  static async login({ email, password }: LoginCredentials): Promise<AuthUser> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
@@ -89,12 +95,12 @@ export class AuthService {
       // Verificar si es admin del SaaS
       const adminDoc = await getDoc(doc(db, 'saas_admins', userCredential.user.uid));
       if (adminDoc.exists()) {
-        const adminData = adminDoc.data();
+        const adminData = adminDoc.data() as SaasAdmin;
         this.currentUser = {
           id: userCredential.user.uid,
           email: userCredential.user.email!,
           name: adminData.name,
-          role: adminData.role as SaasRole
+          role: adminData.role
         };
         return this.currentUser;
       }
@@ -102,31 +108,24 @@ export class AuthService {
       // Si no es admin, buscar en usuarios normales
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       if (!userDoc.exists()) {
-        // Si el usuario existe en Auth pero no en Firestore, lo creamos
-        const newUser: FirebaseUser = {
+        const newUser: AuthUser = {
           name: email.split('@')[0],
-          role: 'secondary',
-          projectIds: [] // Usuario nuevo sin proyectos asignados
+          role: 'viewer',
+          id: userCredential.user.uid,
+          email: userCredential.user.email!
         };
         
         await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
-        
-        return {
-          id: userCredential.user.uid,
-          email: userCredential.user.email,
-          name: newUser.name,
-          role: newUser.role,
-          projectIds: newUser.projectIds
-        };
+        return newUser;
       }
 
-      const userData = userDoc.data() as FirebaseUser;
-      const user: User = {
+      const userData = userDoc.data() as AuthUser;
+      const user: AuthUser = {
         id: userCredential.user.uid,
         email: userCredential.user.email!,
         name: userData.name,
         role: userData.role,
-        organizationId: userData.organizationId,
+        organizationId: userData.organizationId || undefined,
         projectIds: userData.projectIds
       };
 
@@ -146,22 +145,23 @@ export class AuthService {
     }
   }
 
-  static getCurrentUser(): User | null {
+  static getCurrentUser(): AuthUser | null {
     return this.currentUser;
   }
 
-  static initAuthListener(callback: (user: User | null) => void): () => void {
+  static initAuthListener(callback: (user: AuthUser | null) => void): () => void {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
-          const userData = userDoc.data() as FirebaseUser;
-          const user: User = {
+          const userData = userDoc.data() as AuthUser;
+          const user: AuthUser = {
             id: firebaseUser.uid,
             email: firebaseUser.email!,
             name: userData.name,
             role: userData.role,
-            projectIds: userData.projectIds
+            projectIds: userData.projectIds,
+            organizationId: userData.organizationId
           };
           this.currentUser = user;
           callback(user);

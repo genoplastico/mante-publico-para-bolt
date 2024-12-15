@@ -11,6 +11,7 @@ export interface UserPermissions {
   viewAllProjects: boolean;
   assignWorkers: boolean;
   manageUsers: boolean;
+  viewMetrics: boolean;
 }
 
 export interface AuthUser {
@@ -26,4 +27,11 @@ export interface AuthState {
   isAuthenticated: boolean;
   user: AuthUser | null;
   isLoading: boolean;
+}
+
+export interface SaasAdmin {
+  id: string;
+  email: string;
+  name: string;
+  role: 'owner' | 'support';
 }

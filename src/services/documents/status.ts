@@ -6,6 +6,7 @@ export class DocumentStatusService {
     if (!document.expiryDate) return document;
 
     const newStatus = calculateDocumentStatus(document.expiryDate);
+
     return { ...document, status: newStatus };
   }
 }

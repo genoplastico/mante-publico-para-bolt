@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Download, Trash2 } from 'lucide-react';
-import { DocumentStatus } from './DocumentStatus';
+import { DocumentStatus } from '../../components/ui/DocumentStatus';
 import type { Document } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,7 +13,7 @@ interface DocumentListProps {
 
 export function DocumentList({ documents, onDelete }: DocumentListProps) {
   const { hasPermission } = useAuth();
-  const canDelete = hasPermission('deleteDocument');
+  const canDelete = hasPermission?.('deleteDocument') || false;
 
   if (documents.length === 0) {
     return (

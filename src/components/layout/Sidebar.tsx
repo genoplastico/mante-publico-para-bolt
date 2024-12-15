@@ -1,8 +1,11 @@
 import React from 'react';
 import { Building2, Users, FileText, Home, Settings, UserCog } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 import type { SaasRole } from '../../types/auth';
+
+interface SidebarProps {
+  role?: SaasRole;
+}
 
 const getMenuItems = (role?: SaasRole) => [
   ...(role === 'owner' || role === 'support' ? [
@@ -13,18 +16,17 @@ const getMenuItems = (role?: SaasRole) => [
   { path: '/projects', icon: <Building2 />, label: 'Obras' },
   { path: '/workers', icon: <Users />, label: 'Operarios' },
   { path: '/documents', icon: <FileText />, label: 'Documentos' },
-  ...(role === 'owner' || role === 'subscriber' ? [
+  ...(role === 'owner' || role === 'subscriber' || role === 'collaborator' ? [
     { path: '/users', icon: <UserCog />, label: 'Usuarios' }
   ] : []),
   { path: '/settings', icon: <Settings />, label: 'Configuración' }
 ];
 
-export function Sidebar() {
+export function Sidebar({ role }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
 
-  const menuItems = getMenuItems(user?.role);
+  const menuItems = getMenuItems(role);
 
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-200">
