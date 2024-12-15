@@ -1,9 +1,9 @@
 import { 
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
+  onAuthStateChanged
 } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { AuthUser, SaasRole, UserPermissions, SaasAdmin } from '../types/auth';
 import { INITIAL_SAAS_CONFIG } from './saas/constants';
@@ -20,7 +20,9 @@ const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
     viewAllProjects: true,
     assignWorkers: true,
     manageUsers: true,
-    viewMetrics: true
+    viewMetrics: true,
+    manageSubscriptions: true,
+    manageAdmins: true
   },
   support: {
     createProject: false,

@@ -31,13 +31,13 @@ service cloud.firestore {
     // Reglas para saas_admins
     match /saas_admins/{adminId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner() || (isFirstUser() && request.auth.uid == adminId);
+      allow write: if isOwner() || isFirstUser();
     }
 
     // Reglas para saas_config
     match /saas_config/{configId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner() || isFirstUser();
+      allow write: if isOwner() || (isFirstUser() && configId == 'setup');
     }
 
     // Reglas para ownership_requests

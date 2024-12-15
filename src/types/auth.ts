@@ -12,6 +12,8 @@ export interface UserPermissions {
   assignWorkers: boolean;
   manageUsers: boolean;
   viewMetrics: boolean;
+  manageSubscriptions: boolean;
+  manageAdmins: boolean;
 }
 
 export interface AuthUser {
