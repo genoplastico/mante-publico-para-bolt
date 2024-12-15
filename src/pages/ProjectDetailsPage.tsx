@@ -8,7 +8,6 @@ import { WorkersList } from '../components/workers/WorkersList';
 import { WorkerDetailsPage } from './WorkerDetailsPage';
 import { WorkerForm } from '../components/workers/WorkerForm';
 import { Modal } from '../components/ui/Modal';
-import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { WorkerService } from '../services/workers';
 
 interface ProjectDetailsPageProps {
@@ -21,7 +20,6 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
   const [workers, setWorkers] = React.useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = React.useState<Worker | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const { notifications, markAsRead } = useNotificationsContext();
 
   React.useEffect(() => {
     loadWorkers();
@@ -62,7 +60,7 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
   }
 
   return (
-    <DashboardLayout notifications={notifications} onMarkNotificationAsRead={markAsRead}>
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>

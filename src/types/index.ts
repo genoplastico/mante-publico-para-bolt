@@ -1,9 +1,65 @@
+export interface Subscription {
+  id: string;
+  planId: string;
+  userId: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval: 'month' | 'year';
+  features: {
+    maxProjects: number;
+    maxUsersPerProject: number;
+    maxStorage: number; // en GB
+    documentsPerMonth: number;
+    customBranding: boolean;
+    advancedReports: boolean;
+    apiAccess: boolean;
+    priority: boolean;
+  };
+}
+
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   projectIds?: string[];
+  organizationId: string;
+  subscriptionId?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  logo?: string;
+  domain?: string;
+  planId: string;
+  settings: {
+    theme: {
+      primaryColor: string;
+      logo?: string;
+    };
+    features: {
+      documentsEnabled: boolean;
+      workersEnabled: boolean;
+      reportsEnabled: boolean;
+    };
+  };
+  billing: {
+    email: string;
+    address: string;
+    taxId?: string;
+  };
 }
 
 export type UserRole = 'super' | 'secondary';
@@ -105,19 +161,5 @@ export interface DocumentSearchQuery {
   sort?: {
     field: string;
     order: 'asc' | 'desc';
-  };
-}
-
-export interface Notification {
-  id: string;
-  type: 'document_expired' | 'document_expiring' | 'worker_added' | 'document_added';
-  title: string;
-  message: string;
-  createdAt: string;
-  read: boolean;
-  metadata: {
-    workerId?: string;
-    documentId?: string;
-    projectId?: string;
   };
 }

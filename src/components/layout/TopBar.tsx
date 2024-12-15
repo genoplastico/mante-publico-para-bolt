@@ -1,17 +1,10 @@
 import React from 'react';
-import { User, LogOut } from 'lucide-react';
-import { NotificationsPopover } from '../notifications/NotificationsPopover';
+import { LogOut } from 'lucide-react';
 import { RoleIndicator } from '../ui/RoleIndicator';
 import { useAuth } from '../../hooks/useAuth';
-import type { Notification } from '../../types';
 
-interface TopBarProps {
-  notifications: Notification[];
-  onMarkNotificationAsRead: (id: string) => void;
-}
-
-export function TopBar({ notifications, onMarkNotificationAsRead }: TopBarProps) {
-  const { logout } = useAuth();
+export function TopBar() {
+  const { logout, user } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -24,16 +17,15 @@ export function TopBar({ notifications, onMarkNotificationAsRead }: TopBarProps)
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between px-6 py-4">
-        <h1 className="text-xl font-semibold text-gray-800">
-          Gestión de Documentos de Obra
-        </h1>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">
+            {user?.role === 'owner' || user?.role === 'support' 
+              ? 'Panel de Administración SaaS'
+              : 'Gestión de Documentos de Obra'}
+          </h1>
+        </div>
         
         <div className="flex items-center space-x-4">
-          <NotificationsPopover
-            notifications={notifications}
-            onMarkAsRead={onMarkNotificationAsRead}
-          />
-          
           <div className="flex items-center space-x-4">
             <RoleIndicator />
             <button

@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funciones de ayuda
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/saas_admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/saas_admins/$(request.auth.uid)).data.role == 'owner';
+    }
+    
+    function isSupport() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/saas_admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/saas_admins/$(request.auth.uid)).data.role == 'support';
+    }
+    
+    function belongsToOrg(orgId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == orgId;
+    }
+
+    // Reglas para colecciones
+    match /organizations/{orgId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(orgId);
+      allow write: if isOwner() || belongsToOrg(orgId);
+    }
+    
+    match /users/{userId} {
+      allow read: if isOwner() || isSupport() || request.auth.uid == userId;
+      allow write: if isOwner() || request.auth.uid == userId;
+    }
+    
+    match /projects/{projectId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(resource.data.organizationId);
+      allow write: if isOwner() || belongsToOrg(resource.data.organizationId);
+    }
+    
+    match /workers/{workerId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(resource.data.organizationId);
+      allow write: if isOwner() || belongsToOrg(resource.data.organizationId);
+    }
+    
+    match /documents/{documentId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(resource.data.organizationId);
+      allow write: if isOwner() || belongsToOrg(resource.data.organizationId);
+    }
+    
+    match /saas_admins/{adminId} {
+      allow read: if isOwner() || isSupport();
+      allow write: if isOwner();
+    }
+    
+    match /plans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner();
+    }
+    
+    match /subscriptions/{subscriptionId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(resource.data.organizationId);
+      allow write: if isOwner();
+    }
+    
+    match /invitations/{invitationId} {
+      allow read: if isOwner() || isSupport() || belongsToOrg(resource.data.organizationId);
+      allow write: if isOwner() || belongsToOrg(resource.data.organizationId);
+    }
+  }
+}

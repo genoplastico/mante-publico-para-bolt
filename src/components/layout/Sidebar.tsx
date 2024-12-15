@@ -2,13 +2,18 @@ import React from 'react';
 import { Building2, Users, FileText, Home, Settings, UserCog } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import type { SaasRole } from '../../types/auth';
 
-const getMenuItems = (hasManageUsersPermission: boolean) => [
-  { path: '/', icon: <Home />, label: 'Panel Principal' },
+const getMenuItems = (role?: SaasRole) => [
+  ...(role === 'owner' || role === 'support' ? [
+    { path: '/admin', icon: <Home />, label: 'Panel Admin' }
+  ] : [
+    { path: '/', icon: <Home />, label: 'Panel Principal' }
+  ]),
   { path: '/projects', icon: <Building2 />, label: 'Obras' },
   { path: '/workers', icon: <Users />, label: 'Operarios' },
   { path: '/documents', icon: <FileText />, label: 'Documentos' },
-  ...(hasManageUsersPermission ? [
+  ...(role === 'owner' || role === 'subscriber' ? [
     { path: '/users', icon: <UserCog />, label: 'Usuarios' }
   ] : []),
   { path: '/settings', icon: <Settings />, label: 'Configuración' }
@@ -17,8 +22,9 @@ const getMenuItems = (hasManageUsersPermission: boolean) => [
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasPermission } = useAuth();
-  const menuItems = getMenuItems(hasPermission('manageUsers'));
+  const { user } = useAuth();
+
+  const menuItems = getMenuItems(user?.role);
 
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-200">

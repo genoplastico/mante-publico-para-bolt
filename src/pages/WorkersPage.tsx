@@ -6,11 +6,9 @@ import { WorkerForm } from '../components/workers/WorkerForm';
 import { WorkersList } from '../components/workers/WorkersList';
 import { WorkerDetailsPage } from './WorkerDetailsPage';
 import { WorkerService } from '../services/workers';
-import { useNotificationsContext } from '../contexts/NotificationsContext';
 import type { Worker } from '../types';
 
 export function WorkersPage() {
-  const { notifications, markAsRead } = useNotificationsContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
@@ -61,10 +59,7 @@ export function WorkersPage() {
   }
 
   return (
-    <DashboardLayout
-      notifications={notifications}
-      onMarkNotificationAsRead={markAsRead}
-    >
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-900">Operarios</h2>

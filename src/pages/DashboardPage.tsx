@@ -7,10 +7,8 @@ import { ProjectService } from '../services/projects';
 import { WorkerService } from '../services/workers';
 import { DocumentService } from '../services/documents';
 import type { Document, DocumentType } from '../types';
-import { useNotificationsContext } from '../contexts/NotificationsContext';
 
 export function DashboardPage() {
-  const { notifications, markAsRead } = useNotificationsContext();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -68,10 +66,7 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout
-        notifications={notifications}
-        onMarkNotificationAsRead={markAsRead}
-      >
+      <DashboardLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           <span className="ml-3 text-gray-600">Cargando datos...</span>
@@ -82,10 +77,7 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <DashboardLayout
-        notifications={notifications}
-        onMarkNotificationAsRead={markAsRead}
-      >
+      <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
           <p className="text-gray-900 font-medium">{error}</p>
@@ -101,10 +93,7 @@ export function DashboardPage() {
   }
 
   return (
-    <DashboardLayout
-      notifications={notifications}
-      onMarkNotificationAsRead={markAsRead}
-    >
+    <DashboardLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-gray-900">Panel Principal</h1>
         <p className="text-gray-500">Resumen general del sistema</p>

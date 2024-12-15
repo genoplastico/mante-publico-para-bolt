@@ -5,12 +5,10 @@ import { ProjectService } from '../services/projects';
 import { Shield, ShieldAlert, Building2 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../hooks/useAuth';
-import { useNotificationsContext } from '../contexts/NotificationsContext';
 import type { User, Project, UserRole } from '../types';
 
 export function UsersPage() {
   const { hasPermission } = useAuth();
-  const { notifications, markAsRead } = useNotificationsContext();
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -76,10 +74,7 @@ export function UsersPage() {
   }
 
   return (
-    <DashboardLayout
-      notifications={notifications}
-      onMarkNotificationAsRead={markAsRead}
-    >
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>

@@ -5,10 +5,10 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import type { User, FirebaseUser, UserRole, UserPermissions } from '../types';
+import type { AuthUser, SaasRole, UserPermissions } from '../types/auth';
 
-const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
-  super: {
+const ROLE_PERMISSIONS: Record<SaasRole, UserPermissions> = {
+  owner: {
     createProject: true,
     editProject: true,
     deleteProject: true,
@@ -20,7 +20,31 @@ const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
     assignWorkers: true,
     manageUsers: true
   },
-  secondary: {
+  support: {
+    createProject: false,
+    editProject: false,
+    deleteProject: false,
+    uploadDocument: false,
+    deleteDocument: false,
+    createWorker: false,
+    editWorker: false,
+    viewAllProjects: true,
+    assignWorkers: false,
+    manageUsers: false
+  },
+  subscriber: {
+    createProject: true,
+    editProject: true,
+    deleteProject: true,
+    uploadDocument: true,
+    deleteDocument: true,
+    createWorker: true,
+    editWorker: true,
+    viewAllProjects: true,
+    assignWorkers: true,
+    manageUsers: true
+  },
+  viewer: {
     createProject: false,
     editProject: false,
     deleteProject: false,
@@ -31,7 +55,19 @@ const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
     viewAllProjects: false,
     assignWorkers: false,
     manageUsers: false
-  }
+  },
+  collaborator: {
+    createProject: false,
+    editProject: true,
+    deleteProject: false,
+    uploadDocument: true,
+    deleteDocument: false,
+    createWorker: true,
+    editWorker: true,
+    viewAllProjects: false,
+    assignWorkers: false,
+    manageUsers: false
+  },
 };
 
 interface LoginCredentials {
@@ -40,7 +76,7 @@ interface LoginCredentials {
 }
 
 export class AuthService {
-  private static currentUser: User | null = null;
+  private static currentUser: AuthUser | null = null;
 
   static async login({ email, password }: LoginCredentials): Promise<User> {
     try {
@@ -50,8 +86,21 @@ export class AuthService {
         throw new Error('El correo electrónico es requerido');
       }
 
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      // Verificar si es admin del SaaS
+      const adminDoc = await getDoc(doc(db, 'saas_admins', userCredential.user.uid));
+      if (adminDoc.exists()) {
+        const adminData = adminDoc.data();
+        this.currentUser = {
+          id: userCredential.user.uid,
+          email: userCredential.user.email!,
+          name: adminData.name,
+          role: adminData.role as SaasRole
+        };
+        return this.currentUser;
+      }
 
+      // Si no es admin, buscar en usuarios normales
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       if (!userDoc.exists()) {
         // Si el usuario existe en Auth pero no en Firestore, lo creamos
         const newUser: FirebaseUser = {
@@ -77,6 +126,7 @@ export class AuthService {
         email: userCredential.user.email!,
         name: userData.name,
         role: userData.role,
+        organizationId: userData.organizationId,
         projectIds: userData.projectIds
       };
 

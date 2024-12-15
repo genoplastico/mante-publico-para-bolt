@@ -11,8 +11,7 @@ import {
 import { db } from '../config/firebase';
 import { StorageService } from './storage';
 import { AuthService } from './auth';
-import { WorkerService } from './workers';
-import { createNotification } from './notifications';
+import { WorkerService } from './workers'; 
 import type { Document, DocumentType, DocumentSearchQuery, DocumentStatus } from '../types';
 
 const DOCUMENT_METADATA = {
@@ -148,8 +147,8 @@ export class DocumentService {
     if (!document.expiryDate) return document;
 
     const now = new Date();
-    const expiryDate = new Date(document.expiryDate);
-    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const expiry = new Date(document.expiryDate);
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
     let newStatus: DocumentStatus = 'valid';
     if (daysUntilExpiry <= 0) {
@@ -158,42 +157,7 @@ export class DocumentService {
       newStatus = 'expiring_soon';
     }
 
-    // Si el estado ha cambiado, crear una notificación
-    if (newStatus !== document.status) {
-      const user = AuthService.getCurrentUser();
-      if (user) {
-        void this.createStatusChangeNotification(document, newStatus, daysUntilExpiry, user.id);
-      }
-    }
-
     return { ...document, status: newStatus };
-  }
-
-  private static async createStatusChangeNotification(
-    document: Document,
-    newStatus: DocumentStatus,
-    daysUntilExpiry: number,
-    userId: string
-  ): Promise<void> {
-    try {
-      const notificationData = {
-        type: newStatus === 'expired' ? 'document_expired' : 'document_expiring',
-        title: newStatus === 'expired' ? 'Documento Vencido' : 'Documento por Vencer',
-        message: newStatus === 'expired'
-          ? `El documento ${document.name} ha vencido`
-          : `El documento ${document.name} vencerá en ${daysUntilExpiry} días`,
-        metadata: {
-          documentId: document.id,
-          workerId: document.workerId,
-          projectId: document.projectId
-        },
-        userId
-      };
-
-      await createNotification(notificationData);
-    } catch (error) {
-      console.error('Error creating status change notification:', error);
-    }
   }
 
   static async deleteDocument(documentId: string): Promise<void> {

@@ -3,15 +3,13 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { ProjectForm } from '../components/projects/ProjectForm';
-import type { Project } from '../types';
 import { useAuth } from '../hooks/useAuth';
-import { useNotificationsContext } from '../contexts/NotificationsContext';
+import type { Project } from '../types';
 import { ProjectDetailsPage } from './ProjectDetailsPage';
 import { ProjectService } from '../services/projects';
 
 export function ProjectsPage() {
   const { hasPermission } = useAuth();
-  const { notifications, markAsRead } = useNotificationsContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
@@ -87,10 +85,7 @@ export function ProjectsPage() {
   }
 
   return (
-    <DashboardLayout
-      notifications={notifications}
-      onMarkNotificationAsRead={markAsRead}
-    >
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-900">Gestión de Obras</h2>
