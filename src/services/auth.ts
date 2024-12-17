@@ -225,12 +225,12 @@ export class AuthService {
   static hasPermission(permission: keyof UserPermissions): boolean {
     const user = this.getCurrentUser();
     if (!user) return false;
-    return ROLE_PERMISSIONS[user.role][permission];
+    return ROLE_PERMISSIONS[user.role]?.[permission] ?? false;
   }
 
   static getUserPermissions(): UserPermissions | null {
     const user = this.getCurrentUser();
     if (!user) return null;
-    return ROLE_PERMISSIONS[user.role];
+    return ROLE_PERMISSIONS[user.role] ?? null;
   }
 }

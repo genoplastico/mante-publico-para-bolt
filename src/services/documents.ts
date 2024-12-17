@@ -238,12 +238,26 @@ export class DocumentService {
   }> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user) {
-        throw new Error('Usuario no autenticado');
-      }
+      if (!user) return {
+        totalDocuments: 0,
+        expiringDocuments: 0,
+        expiredDocuments: 0,
+        validDocuments: 0,
+        documentsByType: {},
+        upcomingExpirations: []
+      };
 
       const workers = await WorkerService.getWorkers();
       const workerIds = workers.map(w => w.id);
+      
+      if (workerIds.length === 0) return {
+        totalDocuments: 0,
+        expiringDocuments: 0,
+        expiredDocuments: 0,
+        validDocuments: 0,
+        documentsByType: {},
+        upcomingExpirations: []
+      };
       
       const documentsQuery = query(
         collection(db, 'documents'),
