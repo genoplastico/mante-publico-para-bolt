@@ -60,4 +60,17 @@ export class SaasBillingService {
       throw error;
     }
   }
+
+  static async getPaymentsHistory(): Promise<PaymentHistory[]> {
+    try {
+      const snapshot = await getDocs(collection(db, 'payments'));
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as PaymentHistory));
+    } catch (error) {
+      console.error('Error getting payments history:', error);
+      throw error;
+    }
+  }
 }
