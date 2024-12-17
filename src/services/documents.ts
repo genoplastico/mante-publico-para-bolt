@@ -188,7 +188,16 @@ export class DocumentService {
   static async searchDocuments(query: string): Promise<Document[]> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user) throw new Error('Usuario no autenticado');
+      if (!user) {
+        return {
+          totalDocuments: 0,
+          expiringDocuments: 0,
+          expiredDocuments: 0,
+          validDocuments: 0,
+          documentsByType: {},
+          upcomingExpirations: []
+        };
+      }
 
       let documentsQuery = collection(db, 'documents');
       

@@ -225,12 +225,28 @@ export class AuthService {
   static hasPermission(permission: keyof UserPermissions): boolean {
     const user = this.getCurrentUser();
     if (!user) return false;
-    return ROLE_PERMISSIONS[user.role]?.[permission] ?? false;
+    
+    // Map legacy roles to new roles for permissions
+    const roleMap = {
+      super: 'owner',
+      secondary: 'viewer'
+    } as const;
+    
+    const mappedRole = roleMap[user.role as keyof typeof roleMap] || 'viewer';
+    return ROLE_PERMISSIONS[mappedRole]?.[permission] ?? false;
   }
 
   static getUserPermissions(): UserPermissions | null {
     const user = this.getCurrentUser();
     if (!user) return null;
-    return ROLE_PERMISSIONS[user.role] ?? null;
+    
+    // Map legacy roles to new roles for permissions
+    const roleMap = {
+      super: 'owner',
+      secondary: 'viewer'
+    } as const;
+    
+    const mappedRole = roleMap[user.role as keyof typeof roleMap] || 'viewer';
+    return ROLE_PERMISSIONS[mappedRole] ?? null;
   }
 }
