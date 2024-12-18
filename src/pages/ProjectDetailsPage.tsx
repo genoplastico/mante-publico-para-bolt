@@ -1,12 +1,13 @@
 import React from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { Users, FileText, Calendar, Building2 } from 'lucide-react';
+import { Users, FileText, Calendar, Building2, UserPlus, Plus } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { Project, Worker } from '../types';
 import { WorkersList } from '../components/workers/WorkersList';
 import { WorkerDetailsPage } from './WorkerDetailsPage';
 import { WorkerForm } from '../components/workers/WorkerForm';
+import { WorkerSelector } from '../components/projects/WorkerSelector';
 import { Modal } from '../components/ui/Modal';
 import { WorkerService } from '../services/workers';
 
@@ -16,7 +17,8 @@ interface ProjectDetailsPageProps {
 }
 
 export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps) {
-  const [isWorkerModalOpen, setIsWorkerModalOpen] = React.useState(false);
+  const [isCreateWorkerModalOpen, setIsCreateWorkerModalOpen] = React.useState(false);
+  const [isSelectWorkerModalOpen, setIsSelectWorkerModalOpen] = React.useState(false);
   const [workers, setWorkers] = React.useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = React.useState<Worker | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -44,9 +46,19 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
         projectIds: [project.id]
       });
       setWorkers(prev => [...prev, newWorker]);
-      setIsWorkerModalOpen(false);
+      setIsCreateWorkerModalOpen(false);
     } catch (error) {
       console.error('Error adding worker:', error);
+    }
+  };
+
+  const handleAddExistingWorker = async (worker: Worker) => {
+    try {
+      await WorkerService.addWorkerToProject(worker.id, project.id);
+      await loadWorkers();
+      setIsSelectWorkerModalOpen(false);
+    } catch (error) {
+      console.error('Error adding worker to project:', error);
     }
   };
 
@@ -116,13 +128,20 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
           <section className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">Operarios Asignados</h2>
             <div className="mt-4">
-              <div className="mb-4">
+              <div className="mb-4 flex space-x-3">
                 <button
-                  onClick={() => setIsWorkerModalOpen(true)}
+                  onClick={() => setIsCreateWorkerModalOpen(true)}
                   className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  <Users className="mr-2 h-4 w-4" />
-                  Agregar Operario
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Crear y Agregar Operario
+                </button>
+                <button
+                  onClick={() => setIsSelectWorkerModalOpen(true)}
+                  className="inline-flex items-center rounded-md bg-white border border-blue-600 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar desde Listado
                 </button>
               </div>
               
@@ -154,12 +173,24 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
       </div>
       
       <Modal
-        isOpen={isWorkerModalOpen}
-        onClose={() => setIsWorkerModalOpen(false)}
+        isOpen={isCreateWorkerModalOpen}
+        onClose={() => setIsCreateWorkerModalOpen(false)}
         title="Agregar Operario"
       >
         <WorkerForm
           onSubmit={handleAddWorker}
+        />
+      </Modal>
+      
+      <Modal
+        isOpen={isSelectWorkerModalOpen}
+        onClose={() => setIsSelectWorkerModalOpen(false)}
+        title="Agregar Operario Existente"
+      >
+        <WorkerSelector
+          projectId={project.id}
+          onWorkerSelect={handleAddExistingWorker}
+          onClose={() => setIsSelectWorkerModalOpen(false)}
         />
       </Modal>
     </DashboardLayout>

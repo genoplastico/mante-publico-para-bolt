@@ -84,4 +84,28 @@ export class WorkerService {
       throw error instanceof Error ? error : new Error('No se pudo actualizar el operario');
     }
   }
+
+  static async addWorkerToProject(workerId: string, projectId: string): Promise<void> {
+    try {
+      const workerRef = doc(db, 'workers', workerId);
+      const workerDoc = await getDoc(workerRef);
+      
+      if (!workerDoc.exists()) {
+        throw new Error('Operario no encontrado');
+      }
+
+      const worker = workerDoc.data() as Worker;
+      const projectIds = worker.projectIds || [];
+
+      if (!projectIds.includes(projectId)) {
+        await updateDoc(workerRef, {
+          projectIds: [...projectIds, projectId],
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('Error adding worker to project:', error);
+      throw error instanceof Error ? error : new Error('No se pudo agregar el operario al proyecto');
+    }
+  }
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, FileText } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Building2 } from 'lucide-react';
 import type { Worker } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -59,6 +59,12 @@ function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
               <span className="flex items-center text-green-600 text-sm">
                 <CheckCircle2 className="w-4 h-4 mr-1" />
                 Documentación al día
+              </span>
+            )}
+            {worker.projectIds?.length > 0 && (
+              <span className="flex items-center text-gray-600 text-sm">
+                <Building2 className="w-4 h-4 mr-1" />
+                {worker.projectIds.length} {worker.projectIds.length === 1 ? 'obra' : 'obras'}
               </span>
             )}
           </div>
