@@ -17,25 +17,28 @@ export function TopBar() {
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between px-6 py-4">
-        <div>
+        <div className="flex items-center space-x-4">
           <h1 className="text-xl font-semibold text-gray-800">
             {user?.role === 'owner' || user?.role === 'support' 
               ? 'Panel de Administración SaaS'
               : 'Gestión de Documentos de Obra'}
           </h1>
+          {user?.email && (
+            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+              {user.email}
+            </span>
+          )}
         </div>
         
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-4">
-            <RoleIndicator />
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-              title="Cerrar sesión"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
+          <RoleIndicator />
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+            title="Cerrar sesión"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </header>

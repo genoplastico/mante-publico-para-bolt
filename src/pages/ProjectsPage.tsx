@@ -25,7 +25,9 @@ export function ProjectsPage() {
     try {
       setIsLoading(true);
       setError(null);
+      console.log('Loading projects...');
       const fetchedProjects = await ProjectService.getProjects();
+      console.log('Fetched projects:', fetchedProjects);
       setProjects(fetchedProjects);
     } catch (err) {
       const error = err instanceof Error ? err.message : 'Error al cargar los proyectos';
@@ -38,14 +40,19 @@ export function ProjectsPage() {
 
   const handleCreateProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      setError(null);
+      
       if (!hasPermission('createProject')) {
         throw new Error('No tiene permisos para crear proyectos');
       }
+      
       const newProject = await ProjectService.createProject(data);
-      setProjects(prev => [...prev, newProject]);
+      await loadProjects(); // Recargar proyectos después de crear uno nuevo
       setIsModalOpen(false);
     } catch (err) {
-      console.error('Error creating project:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear el proyecto';
+      setError(errorMessage);
+      console.error('Error creating project:', errorMessage);
     }
   };
 
@@ -56,13 +63,7 @@ export function ProjectsPage() {
         throw new Error('No tiene permisos para editar proyectos');
       }
       await ProjectService.updateProject(selectedProject.id, data);
-      setProjects(prev =>
-        prev.map(project =>
-          project.id === selectedProject.id
-            ? { ...project, ...data }
-            : project
-        )
-      );
+      await loadProjects(); // Recargar proyectos después de editar
       setSelectedProject(null);
       setIsModalOpen(false);
     } catch (err) {

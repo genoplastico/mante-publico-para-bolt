@@ -23,9 +23,8 @@ export class ProjectService {
         return [];
       }
 
-      // Siempre filtrar por organizationId
-      let projectsQuery = query(
-        collection(db, 'projects'),
+      // Construir query base con filtro de organización
+      let projectsQuery = query(collection(db, 'projects'),
         where('organizationId', '==', user.organizationId)
       );
       
@@ -35,7 +34,7 @@ export class ProjectService {
       }
       
       const querySnapshot = await getDocs(projectsQuery);
-      const projects = querySnapshot.docs
+      return querySnapshot.docs
         .map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -43,7 +42,6 @@ export class ProjectService {
         .sort((a, b) => 
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
-      return projects;
     } catch (error) {
       const err = error instanceof Error ? error : new Error('Error desconocido');
       console.error('Error fetching projects:', err);
@@ -81,12 +79,21 @@ export class ProjectService {
   static async createProject(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || !user.organizationId) {
-        throw new Error('Usuario no autenticado o sin organización');
+      if (!user) {
+        throw new Error('Debe iniciar sesión para crear proyectos');
       }
 
       if (!AuthService.hasPermission('createProject')) {
         throw new Error('No tiene permisos para crear proyectos');
+      }
+
+      // Verificar organización
+      if (!user.organizationId) {
+        throw new Error('No tiene una organización asignada. Por favor contacte al administrador.');
+      }
+      // Validar datos del proyecto
+      if (!data.name?.trim()) {
+        throw new Error('El nombre del proyecto es requerido');
       }
 
       const now = new Date().toISOString();
@@ -94,18 +101,28 @@ export class ProjectService {
         ...data,
         organizationId: user.organizationId,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        isActive: data.isActive ?? true
       };
+
       const docRef = await addDoc(collection(db, 'projects'), projectData);
+      if (!docRef.id) {
+        throw new Error('Error al crear el proyecto en la base de datos');
+      }
 
       const newDoc = await getDoc(docRef); 
+      if (!newDoc.exists()) {
+        throw new Error('Error al obtener los datos del proyecto creado');
+      }
+
       return {
         id: docRef.id,
         ...newDoc.data()
       } as Project;
     } catch (error) {
-      console.error('Error creating project:', error);
-      throw new Error('No se pudo crear el proyecto');
+      const errorMessage = error instanceof Error ? error.message : 'Error al crear el proyecto';
+      console.error('Error creating project:', errorMessage);
+      throw new Error(errorMessage);
     }
   }
 

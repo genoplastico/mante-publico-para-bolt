@@ -1,7 +1,13 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where, deleteDoc, writeBatch, DocumentReference } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { httpsCallable, getFunctions } from 'firebase/functions';
 import type { User, UserRole } from '../types';
 
+interface BatchOperation {
+  ref: DocumentReference;
+  type: 'update' | 'delete';
+  data?: any;
+}
 export class UserService {
   static async getUsers(): Promise<User[]> {
     try {
@@ -100,16 +106,65 @@ export class UserService {
   static async deleteUser(userId: string): Promise<void> {
     try {
       const userRef = doc(db, 'users', userId);
+      const batch = writeBatch(db);
+      const operations: BatchOperation[] = [];
+
+      // 1. Verificar y obtener datos del usuario
       const userDoc = await getDoc(userRef);
-      
-      if (!userDoc.exists()) {
-        throw new Error('Usuario no encontrado');
+      if (!userDoc.exists()) throw new Error('Usuario no encontrado');
+      const userData = userDoc.data();
+
+      // 2. Eliminar de proyectos asignados
+      if (userData.projectIds?.length) {
+        const projectsQuery = query(
+          collection(db, 'projects'),
+          where('userIds', 'array-contains', userId)
+        );
+        
+        const projectDocs = await getDocs(projectsQuery);
+        projectDocs.forEach(projectDoc => {
+          operations.push({
+            ref: projectDoc.ref,
+            type: 'update',
+            data: {
+              userIds: projectDoc.data().userIds.filter((id: string) => id !== userId)
+            }
+          });
+        });
       }
+
+      // 3. Eliminar documento del usuario
+      operations.push({
+        ref: userRef,
+        type: 'delete'
+      });
+
+      // 4. Aplicar operaciones en batch
+      operations.forEach(op => {
+        if (op.type === 'update') {
+          batch.update(op.ref, op.data);
+        } else if (op.type === 'delete') {
+          batch.delete(op.ref);
+        }
+      });
+
+      await batch.commit();
       
-      await deleteDoc(userRef);
+      // 5. Eliminar usuario de Firebase Auth usando Cloud Functions
+      try {
+        const functions = getFunctions();
+        const deleteUserAuth = httpsCallable(functions, 'deleteUserAuth');
+        await deleteUserAuth({ userId });
+      } catch (authError) {
+        console.error('Error deleting auth user:', authError);
+        // Revertir cambios en Firestore si falla la eliminación en Auth
+        throw new Error('No se pudo eliminar el usuario completamente. Por favor, contacte al administrador.');
+      }
     } catch (error) {
       console.error('Error deleting user:', error);
-      throw error instanceof Error ? error : new Error('No se pudo eliminar el usuario');
+      throw error instanceof Error 
+        ? error 
+        : new Error('Error inesperado al eliminar el usuario');
     }
   }
 }

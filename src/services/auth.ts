@@ -89,8 +89,7 @@ export class AuthService {
   static async login({ email, password }: LoginCredentials): Promise<AuthUser> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      
+
       // Primero verificar si es admin del SaaS
       const adminDoc = await getDoc(doc(db, 'saas_admins', userCredential.user.uid));
       if (adminDoc.exists()) {
@@ -99,7 +98,7 @@ export class AuthService {
           id: userCredential.user.uid,
           email: userCredential.user.email!,
           name: adminData.name,
-          role: adminData.role
+          role: adminData.role || 'owner'
         };
         return this.currentUser;
       }
@@ -110,12 +109,14 @@ export class AuthService {
         // Verificar si hay algún owner configurado
         const configDoc = await getDoc(doc(db, 'saas_config', 'setup'));
         const isFirstUser = !configDoc.exists() || !configDoc.data()?.ownerConfigured;
+        const now = new Date().toISOString();
 
         const newUser: AuthUser = {
           name: email.split('@')[0],
           role: isFirstUser ? 'owner' : 'viewer',
           id: userCredential.user.uid,
-          email: userCredential.user.email!
+          email: userCredential.user.email!,
+          organizationId: orgId
         };
         
         if (isFirstUser) {
@@ -195,8 +196,9 @@ export class AuthService {
           const user: AuthUser = {
             id: firebaseUser.uid,
             email: firebaseUser.email!,
-            name: adminData.name,
-            role: adminData.role
+            name: adminData.name, 
+            role: adminData.role,
+            organizationId: 'default_org'
           };
           this.currentUser = user;
           callback(user);
