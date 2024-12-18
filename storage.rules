@@ -1,7 +1,7 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /documents/{workerId}/{fileName} {
+    match /{allPaths=**} {
       function isAuthenticated() {
         return request.auth != null;
       }
@@ -22,14 +22,11 @@ service firebase.storage {
            request.resource.metadata.role == 'collaborator');
       }
 
-      // Permitir lectura a usuarios autenticados
-      allow read: if isAuthenticated();
+      // Permitir lectura sin restricciones de CORS
+      allow read;
       
-      // Permitir escritura a usuarios con permisos y archivos válidos
-      allow create, update: if hasUploadPermission() && isValidFile();
-      
-      // Permitir eliminación solo a usuarios con permisos
-      allow delete: if hasUploadPermission();
+      // Permitir escritura solo con autenticación y permisos
+      allow write: if isAuthenticated() && hasUploadPermission() && isValidFile();
     }
   }
 }

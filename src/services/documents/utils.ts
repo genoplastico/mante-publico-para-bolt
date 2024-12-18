@@ -1,5 +1,5 @@
 import type { DocumentStatus } from '../../types';
-import { EXPIRY_THRESHOLDS } from './constants';
+import { DOCUMENT_STATUS_CONFIG } from './status/constants';
 
 export function calculateDocumentStatus(expiryDate: string | undefined): DocumentStatus {
   if (!expiryDate) return 'valid';
@@ -9,7 +9,7 @@ export function calculateDocumentStatus(expiryDate: string | undefined): Documen
   const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   if (daysUntilExpiry <= 0) return 'expired';
-  if (daysUntilExpiry <= EXPIRY_THRESHOLDS.WARNING_DAYS) return 'expiring_soon';
+  if (daysUntilExpiry <= DOCUMENT_STATUS_CONFIG.WARNING_THRESHOLD) return 'expiring_soon';
   return 'valid';
 }
 

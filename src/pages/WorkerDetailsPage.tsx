@@ -1,6 +1,7 @@
 import React from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { DocumentStatus } from '../components/documents/DocumentStatus';
+import { DownloadDocumentsButton } from '../components/workers/DownloadDocumentsButton';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { FileText, Upload, ArrowLeft } from 'lucide-react';
@@ -74,6 +75,15 @@ export function WorkerDetailsPage({ worker, onBack }: WorkerDetailsPageProps) {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{worker.name}</h1>
               <p className="text-gray-500">CI: {worker.documentNumber}</p>
+              {documents.length > 0 && (
+                <div className="mt-4">
+                  <DownloadDocumentsButton
+                    workerId={worker.id}
+                    workerName={worker.name}
+                    disabled={documents.length === 0}
+                  />
+                </div>
+              )}
             </div>
             {hasPermission('uploadDocument') && (
               <button

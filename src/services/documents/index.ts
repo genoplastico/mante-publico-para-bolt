@@ -56,6 +56,26 @@ export class DocumentService {
     }
   }
 
+  static async getWorkerDocuments(workerId: string): Promise<Document[]> {
+    try {
+      const q = query(
+        collection(db, 'documents'),
+        where('workerId', '==', workerId)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const documents = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Document));
+
+      return documents.map(doc => DocumentStatusService.updateDocumentStatus(doc));
+    } catch (error) {
+      console.error('Error getting worker documents:', error);
+      throw new Error('Error al obtener los documentos del trabajador');
+    }
+  }
+
   static async deleteDocument(documentId: string): Promise<void> {
     try {
       if (!AuthService.hasPermission('deleteDocument')) {

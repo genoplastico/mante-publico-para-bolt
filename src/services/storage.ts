@@ -125,6 +125,16 @@ export class StorageService {
 
     return null;
   }
+  
+  static isValidUrl(url?: string): boolean {
+    if (!url) return false;
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
 
   private static async processImage(file: File, options: ImageProcessingOptions): Promise<File> {
     try {
