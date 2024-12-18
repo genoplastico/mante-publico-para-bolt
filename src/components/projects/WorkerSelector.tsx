@@ -27,10 +27,13 @@ export function WorkerSelector({ projectId, onWorkerSelect, onClose }: WorkerSel
     try {
       setIsLoading(true);
       const allWorkers = await WorkerService.getWorkers();
-      // Filtrar trabajadores que no estén ya en el proyecto
-      setWorkers(allWorkers.filter(worker => !worker.projectIds?.includes(projectId)));
+      // Solo mostrar trabajadores que no estén en el proyecto actual
+      setWorkers(allWorkers.filter(worker => 
+        !worker.projectIds?.includes(projectId)
+      ));
     } catch (error) {
       console.error('Error loading workers:', error);
+      setWorkers([]);
     } finally {
       setIsLoading(false);
     }
@@ -81,12 +84,17 @@ export function WorkerSelector({ projectId, onWorkerSelect, onClose }: WorkerSel
           {filteredWorkers.map((worker) => (
             <div
               key={worker.id}
-              className="flex items-center justify-between p-3 bg-white rounded-lg border hover:border-blue-500 cursor-pointer"
+              className="flex items-center justify-between p-3 bg-white rounded-lg border hover:border-blue-500 cursor-pointer transition-colors"
               onClick={() => onWorkerSelect(worker)}
             >
               <div>
                 <p className="font-medium text-gray-900">{worker.name}</p>
                 <p className="text-sm text-gray-500">CI: {worker.documentNumber}</p>
+                {worker.projectIds?.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Asignado a {worker.projectIds.length} {worker.projectIds.length === 1 ? 'obra' : 'obras'}
+                  </p>
+                )}
               </div>
               <Plus className="h-5 w-5 text-blue-600" />
             </div>

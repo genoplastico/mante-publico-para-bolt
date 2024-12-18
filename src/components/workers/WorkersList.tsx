@@ -40,15 +40,18 @@ function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
   const { hasPermission } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const expiredDocuments = worker.documents.filter(
     doc => doc.status === 'expired'
   ).length;
 
   useEffect(() => {
     if (worker.projectIds?.length) {
+      setIsLoadingProjects(true);
       ProjectService.getProjectsByIds(worker.projectIds)
         .then(setProjects)
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setIsLoadingProjects(false));
     }
   }, [worker.projectIds]);
 

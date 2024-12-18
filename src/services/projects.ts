@@ -18,48 +18,52 @@ export class ProjectService {
   static async getProjects(): Promise<Project[]> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user) {
-        throw new Error('Usuario no autenticado');
+      if (!user || !user.organizationId) {
+        console.warn('Usuario no autenticado o sin organización');
+        return [];
       }
 
-      let projectsQuery = collection(db, 'projects');
+      // Siempre filtrar por organizationId
+      let projectsQuery = query(
+        collection(db, 'projects'),
+        where('organizationId', '==', user.organizationId)
+      );
       
       // Si es usuario secundario, filtrar por sus proyectos asignados
       if (user.role === 'secondary' && user.projectIds?.length > 0) {
-        projectsQuery = query(
-          collection(db, 'projects'),
-          where(documentId(), 'in', user.projectIds || [])
-        );
-        const querySnapshot = await getDocs(projectsQuery);
-        const projects = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Project));
-        return projects.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
+        projectsQuery = query(projectsQuery, where(documentId(), 'in', user.projectIds));
       }
       
       const querySnapshot = await getDocs(projectsQuery);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Project)).sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
+      const projects = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Project))
+        .sort((a, b) => 
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      return projects;
     } catch (error) {
       const err = error instanceof Error ? error : new Error('Error desconocido');
       console.error('Error fetching projects:', err);
-      throw err;
+      return [];
     }
   }
 
   static async getProjectsByIds(projectIds: string[]): Promise<Project[]> {
     try {
       if (!projectIds.length) return [];
+
+      const user = AuthService.getCurrentUser();
+      if (!user || !user.organizationId) {
+        return [];
+      }
       
+      // Filtrar por organizationId y projectIds
       const q = query(
         collection(db, 'projects'),
+        where('organizationId', '==', user.organizationId),
         where(documentId(), 'in', projectIds)
       );
       
@@ -76,18 +80,25 @@ export class ProjectService {
 
   static async createProject(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
+      const user = AuthService.getCurrentUser();
+      if (!user || !user.organizationId) {
+        throw new Error('Usuario no autenticado o sin organización');
+      }
+
       if (!AuthService.hasPermission('createProject')) {
         throw new Error('No tiene permisos para crear proyectos');
       }
 
       const now = new Date().toISOString();
-      const docRef = await addDoc(collection(db, 'projects'), {
+      const projectData = {
         ...data,
+        organizationId: user.organizationId,
         createdAt: now,
         updatedAt: now
-      });
+      };
+      const docRef = await addDoc(collection(db, 'projects'), projectData);
 
-      const newDoc = await getDoc(docRef);
+      const newDoc = await getDoc(docRef); 
       return {
         id: docRef.id,
         ...newDoc.data()

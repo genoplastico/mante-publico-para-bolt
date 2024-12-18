@@ -86,6 +86,7 @@ export interface FirebaseUser {
 export interface Project {
   id: string;
   name: string;
+  organizationId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -95,6 +96,7 @@ export interface Worker {
   id: string;
   name: string;
   documentNumber: string;
+  organizationId: string;
   projectIds: string[];
   documents: Document[];
 }

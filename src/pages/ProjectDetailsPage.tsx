@@ -19,6 +19,7 @@ interface ProjectDetailsPageProps {
 export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps) {
   const [isCreateWorkerModalOpen, setIsCreateWorkerModalOpen] = React.useState(false);
   const [isSelectWorkerModalOpen, setIsSelectWorkerModalOpen] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [workers, setWorkers] = React.useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = React.useState<Worker | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -34,6 +35,7 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
       setWorkers(projectWorkers);
     } catch (error) {
       console.error('Error loading workers:', error);
+      setError(error instanceof Error ? error.message : 'Error al cargar los operarios');
     } finally {
       setIsLoading(false);
     }
@@ -41,14 +43,21 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
 
   const handleAddWorker = async (data: Omit<Worker, 'id' | 'documents'>) => {
     try {
+      setError(null);
+      setIsLoading(true);
+
       const newWorker = await WorkerService.createWorker({
         ...data,
         projectIds: [project.id]
       });
+
       setWorkers(prev => [...prev, newWorker]);
       setIsCreateWorkerModalOpen(false);
     } catch (error) {
       console.error('Error adding worker:', error);
+      setError(error instanceof Error ? error.message : 'Error al crear el operario');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -128,6 +137,16 @@ export function ProjectDetailsPage({ project, onBack }: ProjectDetailsPageProps)
           <section className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">Operarios Asignados</h2>
             <div className="mt-4">
+              {error && (
+                <div className="mb-4 rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Error</h3>
+                      <div className="mt-2 text-sm text-red-700">{error}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="mb-4 flex space-x-3">
                 <button
                   onClick={() => setIsCreateWorkerModalOpen(true)}

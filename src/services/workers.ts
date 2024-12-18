@@ -16,11 +16,18 @@ export class WorkerService {
   static async getWorkers(projectId?: string): Promise<Worker[]> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user) throw new Error('Usuario no autenticado');
+      if (!user || !user.organizationId) {
+        console.warn('Usuario no autenticado o sin organización');
+        return [];
+      }
 
-      let workersQuery = collection(db, 'workers');
+      // Siempre filtrar por organizationId
+      let workersQuery = query(
+        collection(db, 'workers'),
+        where('organizationId', '==', user.organizationId)
+      );
       
-      // Si es usuario secundario, filtrar por sus proyectos asignados
+      // Aplicar filtros adicionales
       if (user.role === 'secondary' && user.projectIds?.length > 0) {
         workersQuery = query(
           workersQuery,
@@ -40,25 +47,46 @@ export class WorkerService {
       } as Worker));
     } catch (error) {
       console.error('Error fetching workers:', error);
-      throw new Error('No se pudieron obtener los operarios');
+      return [];
     }
   }
 
   static async createWorker(data: Omit<Worker, 'id' | 'documents'>): Promise<Worker> {
     try {
+      const user = AuthService.getCurrentUser();
+      if (!user || !user.organizationId) {
+        throw new Error('Usuario no autenticado o sin organización asignada');
+      }
+
       if (!AuthService.hasPermission('createWorker')) {
         throw new Error('No tiene permisos para crear operarios');
       }
 
+      // Validar campos requeridos
+      if (!data.name || !data.documentNumber) {
+        throw new Error('El nombre y número de documento son requeridos');
+      }
+
       const now = new Date().toISOString();
-      const docRef = await addDoc(collection(db, 'workers'), {
+      const workerData = {
         ...data,
+        organizationId: user.organizationId,
+        projectIds: data.projectIds || [],
         documents: [],
         createdAt: now,
         updatedAt: now
-      });
+      };
+
+      const docRef = await addDoc(collection(db, 'workers'), workerData);
+      if (!docRef.id) {
+        throw new Error('Error al crear el operario');
+      }
 
       const newDoc = await getDoc(docRef);
+      if (!newDoc.exists()) {
+        throw new Error('Error al obtener los datos del operario creado');
+      }
+
       return {
         id: docRef.id,
         ...newDoc.data()

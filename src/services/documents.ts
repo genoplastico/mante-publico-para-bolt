@@ -247,7 +247,7 @@ export class DocumentService {
   }> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user) return {
+      if (!user || !user.organizationId) return {
         totalDocuments: 0,
         expiringDocuments: 0,
         expiredDocuments: 0,
@@ -268,8 +268,9 @@ export class DocumentService {
         upcomingExpirations: []
       };
       
-      const documentsQuery = query(
+      const documentsQuery = query( 
         collection(db, 'documents'),
+        where('organizationId', '==', user.organizationId),
         where('workerId', 'in', workerIds)
       );
       
