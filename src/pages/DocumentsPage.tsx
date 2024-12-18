@@ -3,17 +3,23 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { DocumentSearch } from '../components/documents/DocumentSearch';
 import { DocumentList } from '../components/documents/DocumentList';
 import { DocumentService } from '../services/documents';
-import type { Document, DocumentSearchQuery } from '../types';
+import type { Document } from '../types';
+import type { SearchFilters } from '../services/documents/search/types';
 
 export function DocumentsPage() {
   const [documents, setDocuments] = React.useState<Document[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleSearch = async (query: DocumentSearchQuery) => {
+  const handleSearch = async (query: { text: string; filters?: SearchFilters }) => {
     setIsSearching(true);
+    setError(null);
     try {
-      const results = await DocumentService.searchDocuments(query.text || '');
+      const results = await DocumentService.searchDocuments(query);
       setDocuments(results);
+    } catch (err) {
+      setError('Error al buscar documentos');
+      console.error('Search error:', err);
     } finally {
       setIsSearching(false);
     }
