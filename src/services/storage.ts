@@ -7,12 +7,20 @@ interface UploadOptions {
   disableScaling?: boolean;
 }
 
+import { getStorageErrorMessage } from '../utils/errorUtils';
+
 export class StorageService {
   static async uploadFile(file: File, path: string, options: UploadOptions = {}): Promise<string> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || !user.id) {
-        throw new Error('Debe iniciar sesión para realizar esta acción');
+      if (!user || !AuthService.hasPermission('uploadDocument')) {
+        throw new Error('No tiene permisos para subir archivos');
+      }
+
+      // Validar archivo
+      const validationError = this.validateFile(file);
+      if (validationError) {
+        throw new Error(validationError);
       }
 
       let fileToUpload = file;
@@ -31,26 +39,37 @@ export class StorageService {
       const storageRef = ref(storage, path);
       
       try {
-        const snapshot = await uploadBytes(storageRef, fileToUpload);
+        const snapshot = await uploadBytes(storageRef, fileToUpload, {
+          customMetadata: {
+            uploadedBy: user.id,
+            role: user.role
+          }
+        });
         const url = await getDownloadURL(snapshot.ref);
         return url;
       } catch (uploadError: any) {
+        console.error('Firebase Storage upload error:', uploadError);
         if (uploadError.code === 'storage/unauthorized') {
-          throw new Error('No tiene permisos para subir archivos. Verifique su rol de usuario.');
+          throw new Error(`No tiene permisos para subir archivos. Error: ${uploadError.message}`);
         }
-        console.error('Error uploading to storage:', uploadError);
-        throw new Error('Error al subir el archivo');
+        if (uploadError.code === 'storage/network-error') {
+          throw new Error('Error de conexión. Por favor, verifique su conexión e intente nuevamente.');
+        }
+        const errorMessage = getStorageErrorMessage(uploadError);
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      throw error;
+      throw error instanceof Error 
+        ? error 
+        : new Error('Error inesperado al subir el archivo');
     }
   }
 
   static async deleteFile(path: string): Promise<void> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || user.role !== 'super') {
+      if (!user || !AuthService.hasPermission('deleteDocument')) {
         throw new Error('No tiene permisos para eliminar archivos');
       }
 
@@ -64,11 +83,12 @@ export class StorageService {
 
   static generateFilePath(workerId: string, fileName: string): string {
     const timestamp = Date.now();
-    // Sanitizar el nombre del archivo y mantener la extensión
-    const extension = fileName.split('.').pop();
-    const baseName = fileName.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+    const extension = fileName.split('.').pop() || '';
+    const baseName = fileName.split('.')[0]
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
     const sanitizedFileName = `${baseName}.${extension}`;
-    return `documents/${workerId}/${timestamp}_${sanitizedFileName}`;
+    return `documents/${workerId}/${timestamp}-${sanitizedFileName}`;
   }
 
   static validateFile(file: File): string | null {
@@ -99,7 +119,9 @@ export class StorageService {
       return compressedFile;
     } catch (error) {
       console.error('Error processing image:', error);
-      throw error;
+      throw error instanceof Error 
+        ? error 
+        : new Error('Error inesperado al subir el archivo');
     }
   }
 }

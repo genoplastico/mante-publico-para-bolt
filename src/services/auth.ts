@@ -229,12 +229,15 @@ export class AuthService {
   }
 
   private static readonly ROLE_MAP = {
-    super: 'owner',
-    secondary: 'viewer'
+    super: 'subscriber',
+    secondary: 'collaborator'
   } as const;
 
   private static mapRole(role: string): SaasRole {
-    return this.ROLE_MAP[role as keyof typeof this.ROLE_MAP] || 'viewer';
+    if (role in this.ROLE_MAP) {
+      return this.ROLE_MAP[role as keyof typeof this.ROLE_MAP];
+    }
+    return role as SaasRole;
   }
 
   static hasPermission(permission: keyof UserPermissions): boolean {

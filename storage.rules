@@ -15,19 +15,21 @@ service firebase.storage {
           );
       }
 
-      function isSuperUser() {
-        return isAuthenticated() 
-          && get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'super';
+      function hasUploadPermission() {
+        return isAuthenticated() && 
+          (request.resource.metadata.role == 'owner' ||
+           request.resource.metadata.role == 'subscriber' ||
+           request.resource.metadata.role == 'collaborator');
       }
 
       // Permitir lectura a usuarios autenticados
       allow read: if isAuthenticated();
       
-      // Permitir escritura a usuarios autenticados con archivos válidos
-      allow write: if isAuthenticated() && isValidFile();
+      // Permitir escritura a usuarios con permisos y archivos válidos
+      allow create, update: if hasUploadPermission() && isValidFile();
       
-      // Permitir eliminación solo a superusuarios
-      allow delete: if isSuperUser();
+      // Permitir eliminación solo a usuarios con permisos
+      allow delete: if hasUploadPermission();
     }
   }
 }

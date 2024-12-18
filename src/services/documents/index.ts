@@ -21,13 +21,25 @@ import type { CreateDocumentParams, DocumentStats } from './types';
 export class DocumentService {
   static async uploadDocument({ workerId, type, file, expiryDate, disableScaling }: CreateDocumentParams): Promise<Document> {
     try {
-      if (!AuthService.hasPermission('uploadDocument')) {
-        throw new Error('No tiene permisos para subir documentos');
-      }
-
       const user = AuthService.getCurrentUser();
       if (!user) {
         throw new Error('Usuario no autenticado');
+      }
+
+      // Verificar conexión
+      if (!navigator.onLine) {
+        throw new Error('No hay conexión a internet. Por favor, intente más tarde.');
+      }
+
+      // Verificar que el worker existe y pertenece al usuario
+      const workerDoc = await getDoc(doc(db, 'workers', workerId));
+      if (!workerDoc.exists()) {
+        throw new Error('Operario no encontrado');
+      }
+      
+      const worker = workerDoc.data();
+      if (worker.createdBy !== user.id) {
+        throw new Error('No tiene permisos para subir documentos a este operario');
       }
 
       // Validaciones iniciales
@@ -38,7 +50,13 @@ export class DocumentService {
 
       // Subir archivo
       const filePath = StorageService.generateFilePath(workerId, file.name);
-      const url = await StorageService.uploadFile(file, filePath, { disableScaling });
+      let url;
+      try {
+        url = await StorageService.uploadFile(file, filePath, { disableScaling });
+      } catch (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error('Error al subir el archivo. Por favor, verifique su conexión e intente nuevamente.');
+      }
 
       // Preparar metadata
       const metadata = DOCUMENT_METADATA[type];
@@ -81,7 +99,9 @@ export class DocumentService {
       return DocumentStatusService.updateDocumentStatus(newDocument);
     } catch (error) {
       console.error('Error uploading document:', error);
-      throw error instanceof Error ? error : new Error('Error al subir el documento');
+      throw error instanceof Error 
+        ? error 
+        : new Error('Error al subir el documento. Por favor, intente nuevamente.');
     }
   }
 

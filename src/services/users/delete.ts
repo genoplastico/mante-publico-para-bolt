@@ -47,19 +47,20 @@ export async function deleteUser(userId: string): Promise<void> {
     // 4. Eliminar usuario de Auth usando Cloud Function
     try {
       const functions = getFunctions();
-      const deleteUserAuth = httpsCallable<{ userId: string }, { success: boolean }>(
+      const deleteUserAuth = httpsCallable<{ userId: string }, { success: boolean; message: string }>(
         functions, 
         'deleteUserAuth'
       );
       
       const result = await deleteUserAuth({ userId });
       
-      if (!result.data.success) {
-        throw new Error('Error al eliminar el usuario de autenticación');
+      if (!result.data.success && result.data.message !== 'Usuario no encontrado en autenticación') {
+        throw new Error(result.data.message || 'Error al eliminar el usuario de autenticación');
       }
     } catch (authError) {
       console.error('Error deleting auth user:', authError);
-      throw new Error('No se pudo eliminar el usuario de autenticación');
+      // Continuar con la eliminación en Firestore incluso si falla Auth
+      console.warn('Continuando con eliminación en Firestore...');
     }
 
     // 5. Si la eliminación de Auth fue exitosa, proceder con Firestore
