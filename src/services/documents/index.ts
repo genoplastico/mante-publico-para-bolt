@@ -1,240 +1,104 @@
-import { 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  where, 
-  getDocs, 
-  getDoc 
-} from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { StorageService } from '../storage';
 import { AuthService } from '../auth';
-import { WorkerService } from '../workers';
 import { DocumentStatusService } from './status';
-import { DocumentSearchService } from './search';
-import { DOCUMENT_METADATA } from './metadata';
-import type { Document } from '../../types';
-import type { CreateDocumentParams, DocumentStats } from './types';
-
-import { collection, query, where, getDocs, QueryConstraint } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { AuthService } from '../auth';
-import type { Document, DocumentType } from '../types';
-import type { SearchFilters } from './search/types';
-
-interface SearchQuery {
-  text?: string;
-  filters?: SearchFilters;
-}
+import { DOCUMENT_TYPES } from './constants';
+import type { Document, DocumentType } from '../../types';
+import type { DocumentStats } from './types/document.types';
 
 export class DocumentService {
-  static async searchDocuments(searchQuery: SearchQuery = {}): Promise<Document[]> {
+  static async getDocuments(): Promise<Document[]> {
     try {
       const user = AuthService.getCurrentUser();
       if (!user) {
-        throw new Error('Usuario no autenticado');
+        throw new Error('ERR_NOT_AUTHENTICATED');
       }
 
-      // Construir constraints base
-      const constraints: QueryConstraint[] = [];
+      // Construir query base
+      let documentsQuery = collection(db, 'documents');
 
-      // Aplicar filtros de tipo
-      if (searchQuery.filters?.type?.length) {
-        constraints.push(where('type', 'in', searchQuery.filters.type));
+      // Aplicar filtros según el rol
+      if (user.role === 'secondary' && user.projectIds?.length) {
+        documentsQuery = query(
+          documentsQuery,
+          where('projectId', 'in', user.projectIds)
+        );
+      } else {
+        documentsQuery = query(
+          documentsQuery,
+          where('createdBy', '==', user.id)
+        );
       }
 
-      // Aplicar filtros de estado
-      if (searchQuery.filters?.status?.length) {
-        constraints.push(where('status', 'in', searchQuery.filters.status));
-      }
-
-      // Construir y ejecutar query
-      const q = query(collection(db, 'documents'), ...constraints);
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(documentsQuery);
       
-      let documents = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Document));
-
-      // Aplicar filtro de texto si existe
-      if (searchQuery.text) {
-        const searchText = searchQuery.text.toLowerCase();
-        documents = documents.filter(doc => {
-          const searchableText = [
-            DOCUMENT_TYPES[doc.type],
-            doc.metadata?.description,
-            ...(doc.metadata?.keywords || []),
-            doc.name
-          ].join(' ').toLowerCase();
-          
-          return searchableText.includes(searchText);
-        });
+      if (snapshot.empty) {
+        return [];
       }
 
-      return documents;
+      // Mapear documentos y asegurar valores por defecto
+      const documents = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          documentType: DOCUMENT_TYPES[data.type as DocumentType] || 'Documento sin tipo',
+          workerName: data.workerName || 'Trabajador no encontrado',
+          status: data.status || 'valid'
+        } as Document;
+      });
+
+      // Actualizar estados
+      return documents.map(doc => DocumentStatusService.updateDocumentStatus(doc));
     } catch (error) {
-      console.error('Error searching documents:', error);
-      throw error instanceof Error 
-        ? error 
-        : new Error('Error al buscar documentos');
-    }
-  }
-
-  static async uploadDocument({ workerId, type, file, expiryDate, disableScaling }: CreateDocumentParams): Promise<Document> {
-    try {
-      const user = AuthService.getCurrentUser();
-      if (!user) {
-        throw new Error('Usuario no autenticado');
-      }
-
-      // Verificar conexión
-      if (!navigator.onLine) {
-        throw new Error('No hay conexión a internet. Por favor, intente más tarde.');
-      }
-
-      // Verificar que el worker existe y pertenece al usuario
-      const workerDoc = await getDoc(doc(db, 'workers', workerId));
-      if (!workerDoc.exists()) {
-        throw new Error('Operario no encontrado');
-      }
-      
-      const worker = workerDoc.data();
-      if (worker.createdBy !== user.id) {
-        throw new Error('No tiene permisos para subir documentos a este operario');
-      }
-
-      // Validaciones iniciales
-      const validationError = StorageService.validateFile(file);
-      if (validationError) {
-        throw new Error(validationError);
-      }
-
-      // Subir archivo
-      const filePath = StorageService.generateFilePath(workerId, file.name);
-      let url;
-      try {
-        url = await StorageService.uploadFile(file, filePath, { disableScaling });
-      } catch (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error('Error al subir el archivo. Por favor, verifique su conexión e intente nuevamente.');
-      }
-
-      // Preparar metadata
-      const metadata = DOCUMENT_METADATA[type];
-      const now = new Date().toISOString();
-    
-      const documentData: Omit<Document, 'id'> = {
-        type,
-        name: file.name,
-        url,
-        status: 'valid',
-        uploadedAt: now,
-        expiryDate,
-        workerId,
-        createdBy: user.id,
-        workerName: worker.name,
-        metadata: {
-          description: metadata.description,
-          keywords: metadata.keywords,
-          category: metadata.category,
-          lastModified: now,
-          modifiedBy: user.id,
-          version: 1,
-          tags: [metadata.category],
-        },
-        auditLog: {
-          createdAt: now,
-          createdBy: user.id,
-          actions: [{
-            type: 'create',
-            timestamp: now,
-            userId: user.id,
-            details: `Documento ${type} creado para el trabajador ${workerId}`
-          }]
-        }
-      };
-
-      // Crear documento en Firestore
-      const docRef = await addDoc(collection(db, 'documents'), documentData);
-      const newDocument = { id: docRef.id, ...documentData };
-
-      // Actualizar estado inicial
-      return DocumentStatusService.updateDocumentStatus(newDocument);
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      throw error instanceof Error 
-        ? error 
-        : new Error('Error al subir el documento. Por favor, intente nuevamente.');
-    }
-  }
-
-  static async getWorkerDocuments(workerId: string): Promise<Document[]> {
-    try {
-      const q = query(
-        collection(db, 'documents'),
-        where('workerId', '==', workerId)
-      );
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Document));
-    } catch (error) {
-      throw new Error('Error al obtener los documentos');
+      console.error('Error fetching documents:', error);
+      throw new Error('ERR_FETCH_DOCUMENTS');
     }
   }
 
   static async deleteDocument(documentId: string): Promise<void> {
     try {
       if (!AuthService.hasPermission('deleteDocument')) {
-        throw new Error('No tiene permisos para eliminar documentos');
+        throw new Error('ERR_PERMISSION_DENIED');
       }
 
       const docRef = doc(db, 'documents', documentId);
       const docSnap = await getDoc(docRef);
       
-      if (docSnap.exists()) {
-        const document = docSnap.data() as Document;
-        
+      if (!docSnap.exists()) {
+        throw new Error('ERR_DOCUMENT_NOT_FOUND');
+      }
+
+      const document = docSnap.data() as Document;
+
+      // Eliminar archivo de Storage si existe URL
+      if (document.url) {
         const pathMatch = document.url.match(/documents%2F.+\?/);
         if (pathMatch) {
           const path = decodeURIComponent(pathMatch[0].replace('?', ''));
           await StorageService.deleteFile(path);
         }
-        
-        await deleteDoc(docRef);
       }
+
+      await deleteDoc(docRef);
     } catch (error) {
-      throw new Error('Error al eliminar el documento');
+      console.error('Error deleting document:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('ERR_DELETE_DOCUMENT');
     }
   }
 
-  static async getDashboardStats(): Promise<DocumentStats> {
+  static async getDocumentStats(): Promise<DocumentStats> {
     try {
       const user = AuthService.getCurrentUser();
       if (!user) {
-        throw new Error('Usuario no autenticado');
+        throw new Error('ERR_NOT_AUTHENTICATED');
       }
 
-      const workers = await WorkerService.getWorkers();
-      const workerIds = workers.map(w => w.id);
-      
-      const documentsQuery = query(
-        collection(db, 'documents'),
-        where('workerId', 'in', workerIds)
-      );
-      
-      const querySnapshot = await getDocs(documentsQuery);
-      const documents = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Document));
-
-      const workerMap = new Map(workers.map(w => [w.id, w]));
-      const now = new Date();
+      const documents = await this.getDocuments();
       
       const stats: DocumentStats = {
         totalDocuments: documents.length,
@@ -244,24 +108,12 @@ export class DocumentService {
         documentsByType: {} as Record<DocumentType, number>,
         upcomingExpirations: []
       };
-      
+
       documents.forEach(doc => {
-        const updatedDoc = DocumentStatusService.updateDocumentStatus(doc);
-        doc.status = updatedDoc.status;
+        // Contar por tipo
+        stats.documentsByType[doc.type] = (stats.documentsByType[doc.type] || 0) + 1;
 
-        if (doc.expiryDate) {
-          const expiryDate = new Date(doc.expiryDate);
-          const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (daysUntilExpiry > 0 && daysUntilExpiry <= 15) {
-            stats.upcomingExpirations.push({
-              document: doc,
-              daysUntilExpiry,
-              workerName: doc.workerId ? workerMap.get(doc.workerId)?.name : undefined
-            });
-          }
-        }
-
+        // Contar por estado
         switch (doc.status) {
           case 'expired':
             stats.expiredDocuments++;
@@ -273,22 +125,28 @@ export class DocumentService {
             stats.validDocuments++;
             break;
         }
-        
-        stats.documentsByType[doc.type] = (stats.documentsByType[doc.type] || 0) + 1;
+
+        // Agregar a próximos vencimientos si aplica
+        if (doc.status === 'expiring_soon') {
+          const daysUntilExpiry = doc.expiryDate 
+            ? Math.ceil((new Date(doc.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+            : 0;
+
+          stats.upcomingExpirations.push({
+            document: doc,
+            daysUntilExpiry,
+            workerName: doc.workerName
+          });
+        }
       });
-      
+
+      // Ordenar próximos vencimientos
       stats.upcomingExpirations.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
-      
+
       return stats;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Error desconocido');
-      console.error('Error getting dashboard stats:', err);
-      throw err;
+      console.error('Error getting document stats:', error);
+      throw new Error('ERR_GET_STATS');
     }
   }
-
-  // Re-export functionality from other modules
-  static readonly search = DocumentSearchService.searchDocuments;
-  static readonly searchWithFilters = DocumentSearchService.searchWithFilters;
-  static readonly updateDocumentStatus = DocumentStatusService.updateDocumentStatus;
 }

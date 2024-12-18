@@ -122,24 +122,3 @@ export type DocumentType =
   | 'cert_seguro';
 
 export type DocumentStatus = 'valid' | 'expired' | 'expiring_soon';
-
-export interface DocumentSearchQuery {
-  text?: string;
-  filters?: {
-    type?: DocumentType[];
-    status?: DocumentStatus[];
-    dateRange?: {
-      start: string;
-      end: string;
-    };
-    metadata?: {
-      keywords?: string[];
-      category?: string;
-      tags?: string[];
-    };
-  };
-  sort?: {
-    field: string;
-    order: 'asc' | 'desc';
-  };
-}
