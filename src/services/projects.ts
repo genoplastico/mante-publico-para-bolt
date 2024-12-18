@@ -54,6 +54,26 @@ export class ProjectService {
     }
   }
 
+  static async getProjectsByIds(projectIds: string[]): Promise<Project[]> {
+    try {
+      if (!projectIds.length) return [];
+      
+      const q = query(
+        collection(db, 'projects'),
+        where(documentId(), 'in', projectIds)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Project));
+    } catch (error) {
+      console.error('Error fetching projects by ids:', error);
+      return [];
+    }
+  }
+
   static async createProject(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
       if (!AuthService.hasPermission('createProject')) {

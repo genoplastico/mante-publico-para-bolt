@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle2, FileText, Building2 } from 'lucide-react';
-import type { Worker } from '../../types';
+import type { Worker, Project } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { ProjectService } from '../../services/projects';
 
 interface WorkersListProps {
   workers: Worker[];
@@ -37,9 +38,19 @@ interface WorkerCardProps {
 
 function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
   const { hasPermission } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [showTooltip, setShowTooltip] = useState(false);
   const expiredDocuments = worker.documents.filter(
     doc => doc.status === 'expired'
   ).length;
+
+  useEffect(() => {
+    if (worker.projectIds?.length) {
+      ProjectService.getProjectsByIds(worker.projectIds)
+        .then(setProjects)
+        .catch(console.error);
+    }
+  }, [worker.projectIds]);
 
   return (
     <div className="bg-white rounded-lg border p-4 hover:border-blue-200 transition-colors">
@@ -62,9 +73,27 @@ function WorkerCard({ worker, onViewDetails }: WorkerCardProps) {
               </span>
             )}
             {worker.projectIds?.length > 0 && (
-              <span className="flex items-center text-gray-600 text-sm">
+              <span
+                className="flex items-center text-gray-600 text-sm relative cursor-help"
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
                 <Building2 className="w-4 h-4 mr-1" />
                 {worker.projectIds.length} {worker.projectIds.length === 1 ? 'obra' : 'obras'}
+                {showTooltip && projects.length > 0 && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg z-50">
+                    <div className="font-medium mb-1">Obras asignadas:</div>
+                    <ul className="space-y-1">
+                      {projects.map(project => (
+                        <li key={project.id} className="flex items-center">
+                          <Building2 className="w-3 h-3 mr-1 text-gray-400" />
+                          {project.name}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="absolute -bottom-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                  </div>
+                )}
               </span>
             )}
           </div>
