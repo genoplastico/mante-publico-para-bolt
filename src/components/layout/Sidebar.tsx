@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Users, FileText, Home, Settings, UserCog } from 'lucide-react';
+import { Building2, Users, Home, Settings, UserCog } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { SaasRole } from '../../types/auth';
 
@@ -15,7 +15,6 @@ const getMenuItems = (role?: SaasRole) => [
   ]),
   { path: '/projects', icon: <Building2 />, label: 'Obras' },
   { path: '/workers', icon: <Users />, label: 'Operarios' },
-  { path: '/documents', icon: <FileText />, label: 'Documentos' },
   ...(role === 'owner' || role === 'subscriber' || role === 'collaborator' ? [
     { path: '/users', icon: <UserCog />, label: 'Usuarios' }
   ] : []),

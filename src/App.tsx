@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Navigate } from 'react-router-dom';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { DocumentsPage } from './pages/DocumentsPage';
 import { WorkersPage } from './pages/WorkersPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';

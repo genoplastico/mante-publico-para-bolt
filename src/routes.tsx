@@ -12,7 +12,6 @@ import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { WorkersPage } from './pages/WorkersPage';
-import { DocumentsPage } from './pages/DocumentsPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 import type { AuthUser } from './types/auth';
@@ -44,7 +43,6 @@ export function AppRoutes({ user }: AppRoutesProps) {
       <Route path="/" element={<DashboardPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/workers" element={<WorkersPage />} />
-      <Route path="/documents" element={<DocumentsPage />} />
       <Route path="/users" element={<UsersPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
