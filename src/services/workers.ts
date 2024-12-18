@@ -16,15 +16,15 @@ export class WorkerService {
   static async getWorkers(projectId?: string): Promise<Worker[]> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || !user.organizationId) {
-        console.warn('Usuario no autenticado o sin organización');
+      if (!user) {
+        console.warn('Usuario no autenticado');
         return [];
       }
 
-      // Siempre filtrar por organizationId
+      // Filtrar por usuario creador
       let workersQuery = query(
         collection(db, 'workers'),
-        where('organizationId', '==', user.organizationId)
+        where('createdBy', '==', user.id)
       );
       
       // Aplicar filtros adicionales
@@ -54,8 +54,8 @@ export class WorkerService {
   static async createWorker(data: Omit<Worker, 'id' | 'documents'>): Promise<Worker> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || !user.organizationId) {
-        throw new Error('Usuario no autenticado o sin organización asignada');
+      if (!user) {
+        throw new Error('Usuario no autenticado');
       }
 
       if (!AuthService.hasPermission('createWorker')) {
@@ -70,7 +70,7 @@ export class WorkerService {
       const now = new Date().toISOString();
       const workerData = {
         ...data,
-        organizationId: user.organizationId,
+        createdBy: user.id,
         projectIds: data.projectIds || [],
         documents: [],
         createdAt: now,

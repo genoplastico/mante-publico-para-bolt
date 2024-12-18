@@ -1,6 +1,6 @@
 import { doc, getDoc, writeBatch, query, where, collection, getDocs } from 'firebase/firestore';
-import { deleteUser as deleteAuthUser } from 'firebase/auth';
-import { db, auth } from '../../config/firebase';
+import { httpsCallable, getFunctions } from 'firebase/functions';
+import { db } from '../../config/firebase';
 import type { BatchOperation } from './types';
 import type { User } from '../../types';
 
@@ -44,15 +44,22 @@ export async function deleteUser(userId: string): Promise<void> {
       type: 'delete'
     });
 
-    // 4. Eliminar usuario de Auth
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      try {
-        await deleteAuthUser(currentUser);
-      } catch (authError) {
-        console.error('Error deleting auth user:', authError);
-        throw new Error('No se pudo eliminar el usuario de autenticación');
+    // 4. Eliminar usuario de Auth usando Cloud Function
+    try {
+      const functions = getFunctions();
+      const deleteUserAuth = httpsCallable<{ userId: string }, { success: boolean }>(
+        functions, 
+        'deleteUserAuth'
+      );
+      
+      const result = await deleteUserAuth({ userId });
+      
+      if (!result.data.success) {
+        throw new Error('Error al eliminar el usuario de autenticación');
       }
+    } catch (authError) {
+      console.error('Error deleting auth user:', authError);
+      throw new Error('No se pudo eliminar el usuario de autenticación');
     }
 
     // 5. Si la eliminación de Auth fue exitosa, proceder con Firestore

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, AlertCircle, CheckCircle2, Users } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { useAuth } from '../hooks/useAuth';
-import type { Project } from '../types';
+import type { Project, Worker } from '../types';
 import { ProjectDetailsPage } from './ProjectDetailsPage';
 import { ProjectService } from '../services/projects';
+import { WorkerService } from '../services/workers';
 
 export function ProjectsPage() {
   const { hasPermission } = useAuth();
@@ -15,6 +16,7 @@ export function ProjectsPage() {
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [projectWorkers, setProjectWorkers] = useState<Record<string, Worker[]>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,6 +29,14 @@ export function ProjectsPage() {
       setError(null);
       console.log('Loading projects...');
       const fetchedProjects = await ProjectService.getProjects();
+      
+      // Cargar trabajadores para cada proyecto
+      const workersMap: Record<string, Worker[]> = {};
+      for (const project of fetchedProjects) {
+        const workers = await WorkerService.getWorkers(project.id);
+        workersMap[project.id] = workers;
+      }
+      setProjectWorkers(workersMap);
       console.log('Fetched projects:', fetchedProjects);
       setProjects(fetchedProjects);
     } catch (err) {
@@ -124,6 +134,7 @@ export function ProjectsPage() {
                 key={project.id}
                 project={project}
                 onView={() => setViewingProject(project)}
+                workers={projectWorkers[project.id] || []}
                 onEdit={() => openEditModal(project)}
               />
             ))}
@@ -152,11 +163,13 @@ interface ProjectCardProps {
   project: Project;
   onEdit: () => void;
   onView: () => void;
+  workers: Worker[];
 }
 
-function ProjectCard({ project, onEdit, onView }: ProjectCardProps) {
+function ProjectCard({ project, onEdit, onView, workers }: ProjectCardProps) {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('editProject');
+  const [showTooltip, setShowTooltip] = React.useState(false);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -177,6 +190,28 @@ function ProjectCard({ project, onEdit, onView }: ProjectCardProps) {
             )}
             <span className="text-sm text-gray-500">
               · Actualizada el {new Date(project.updatedAt).toLocaleDateString('es-ES')}
+            </span>
+            <span
+              className="flex items-center text-gray-600 text-sm relative cursor-help"
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+            >
+              <Users className="w-4 h-4 mr-1" />
+              {workers.length} {workers.length === 1 ? 'operario' : 'operarios'}
+              {showTooltip && workers.length > 0 && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg z-50">
+                  <div className="font-medium mb-1">Operarios asignados:</div>
+                  <ul className="space-y-1">
+                    {workers.map(worker => (
+                      <li key={worker.id} className="flex items-center">
+                        <Users className="w-3 h-3 mr-1 text-gray-400" />
+                        {worker.name}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="absolute -bottom-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                </div>
+              )}
             </span>
           </div>
         </div>

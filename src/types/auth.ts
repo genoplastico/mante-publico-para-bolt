@@ -21,7 +21,6 @@ export interface AuthUser {
   email: string;
   name: string;
   role: SaasRole;
-  organizationId?: string;
   projectIds?: string[];
 }
 

@@ -115,8 +115,7 @@ export class AuthService {
           name: email.split('@')[0],
           role: isFirstUser ? 'owner' : 'viewer',
           id: userCredential.user.uid,
-          email: userCredential.user.email!,
-          organizationId: orgId
+          email: userCredential.user.email!
         };
         
         if (isFirstUser) {

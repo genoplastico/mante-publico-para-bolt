@@ -18,19 +18,23 @@ export class ProjectService {
   static async getProjects(): Promise<Project[]> {
     try {
       const user = AuthService.getCurrentUser();
-      if (!user || !user.organizationId) {
-        console.warn('Usuario no autenticado o sin organización');
+      if (!user) {
+        console.warn('Usuario no autenticado');
         return [];
       }
 
-      // Construir query base con filtro de organización
-      let projectsQuery = query(collection(db, 'projects'),
-        where('organizationId', '==', user.organizationId)
+      // Construir query base con filtro de usuario creador
+      let projectsQuery = query(
+        collection(db, 'projects'),
+        where('createdBy', '==', user.id)
       );
       
       // Si es usuario secundario, filtrar por sus proyectos asignados
       if (user.role === 'secondary' && user.projectIds?.length > 0) {
-        projectsQuery = query(projectsQuery, where(documentId(), 'in', user.projectIds));
+        projectsQuery = query(
+          projectsQuery, 
+          where(documentId(), 'in', user.projectIds)
+        );
       }
       
       const querySnapshot = await getDocs(projectsQuery);
@@ -54,14 +58,15 @@ export class ProjectService {
       if (!projectIds.length) return [];
 
       const user = AuthService.getCurrentUser();
-      if (!user || !user.organizationId) {
+      if (!user) {
+        console.warn('Usuario no autenticado');
         return [];
       }
       
-      // Filtrar por organizationId y projectIds
+      // Filtrar por creador y projectIds
       const q = query(
         collection(db, 'projects'),
-        where('organizationId', '==', user.organizationId),
+        where('createdBy', '==', user.id),
         where(documentId(), 'in', projectIds)
       );
       
@@ -80,17 +85,13 @@ export class ProjectService {
     try {
       const user = AuthService.getCurrentUser();
       if (!user) {
-        throw new Error('Debe iniciar sesión para crear proyectos');
+        throw new Error('Usuario no autenticado');
       }
 
       if (!AuthService.hasPermission('createProject')) {
         throw new Error('No tiene permisos para crear proyectos');
       }
 
-      // Verificar organización
-      if (!user.organizationId) {
-        throw new Error('No tiene una organización asignada. Por favor contacte al administrador.');
-      }
       // Validar datos del proyecto
       if (!data.name?.trim()) {
         throw new Error('El nombre del proyecto es requerido');
@@ -99,7 +100,7 @@ export class ProjectService {
       const now = new Date().toISOString();
       const projectData = {
         ...data,
-        organizationId: user.organizationId,
+        createdBy: user.id,
         createdAt: now,
         updatedAt: now,
         isActive: data.isActive ?? true

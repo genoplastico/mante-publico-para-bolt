@@ -38,30 +38,6 @@ export interface User {
   subscriptionId?: string;
 }
 
-export interface Organization {
-  id: string;
-  name: string;
-  logo?: string;
-  domain?: string;
-  planId: string;
-  settings: {
-    theme: {
-      primaryColor: string;
-      logo?: string;
-    };
-    features: {
-      documentsEnabled: boolean;
-      workersEnabled: boolean;
-      reportsEnabled: boolean;
-    };
-  };
-  billing: {
-    email: string;
-    address: string;
-    taxId?: string;
-  };
-}
-
 export type UserRole = 'super' | 'secondary';
 
 export interface UserPermissions {
@@ -86,7 +62,7 @@ export interface FirebaseUser {
 export interface Project {
   id: string;
   name: string;
-  organizationId: string;
+  createdBy: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -96,7 +72,7 @@ export interface Worker {
   id: string;
   name: string;
   documentNumber: string;
-  organizationId: string;
+  createdBy: string;
   projectIds: string[];
   documents: Document[];
 }
