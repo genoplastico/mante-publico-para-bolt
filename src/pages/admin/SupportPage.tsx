@@ -82,20 +82,16 @@ export function SupportPage() {
             <details className="group">
               <summary className="flex justify-between items-center font-medium cursor-pointer list-none">
                 <span>¿Cómo puedo cambiar mi plan?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                </span>
+                <span className="transition group-open:rotate-180">▼</span>
               </summary>
               <p className="text-gray-600 mt-3">
-                Puede cambiar su plan en cualquier momento desde la sección de Configuración y Plan.
+                Puede cambiar su plan en cualquier momento desde la sección de Configuración y Plan y Facturación.
               </p>
             </details>
             <details className="group">
               <summary className="flex justify-between items-center font-medium cursor-pointer list-none">
                 <span>¿Cómo puedo agregar más usuarios?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                </span>
+                <span className="transition group-open:rotate-180">▼</span>
               </summary>
               <p className="text-gray-600 mt-3">
                 Los usuarios adicionales pueden ser agregados desde la sección de Usuarios, según los límites de su plan actual.
@@ -104,9 +100,7 @@ export function SupportPage() {
             <details className="group">
               <summary className="flex justify-between items-center font-medium cursor-pointer list-none">
                 <span>¿Cuál es el límite de almacenamiento?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                </span>
+                <span className="transition group-open:rotate-180">▼</span>
               </summary>
               <p className="text-gray-600 mt-3">
                 El límite de almacenamiento depende de su plan actual. Puede ver los detalles en la sección de Plan y Facturación.

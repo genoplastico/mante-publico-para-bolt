@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { UserService } from '../../services/users';
-import { Shield, Users, AlertCircle, Mail, UserCog } from 'lucide-react';
+import { Shield, Users, AlertCircle, Mail, UserCog, Trash2 } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
 import type { User, SaasRole } from '../../types';
 
 const getRoleStyle = (role: string): string => {
@@ -15,16 +16,19 @@ const getRoleStyle = (role: string): string => {
   }
 };
 
-const ROLE_OPTIONS = [
+const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'super', label: 'Administrador' },
   { value: 'secondary', label: 'Usuario' }
-};
+];
 
 export function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<{ id: string; loading: boolean } | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -56,6 +60,23 @@ export function AdminUsersPage() {
       setError('Error al actualizar el rol del usuario');
     } finally {
       setUpdateStatus(null);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await UserService.deleteUser(userToDelete.id);
+      setUsers(users.filter(user => user.id !== userToDelete.id));
+      setIsDeleteModalOpen(false);
+      setUserToDelete(null);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setError('Error al eliminar el usuario');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -122,6 +143,16 @@ export function AdminUsersPage() {
                             </option>
                           ))}
                         </select>
+                        <button
+                          onClick={() => {
+                            setUserToDelete(user);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="ml-4 p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
                         {updateStatus?.id === user.id && (
                           <div className="ml-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
@@ -147,6 +178,52 @@ export function AdminUsersPage() {
           <Users className="h-4 w-4 mr-2" />
           Total de usuarios: {users.length}
         </div>
+
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setUserToDelete(null);
+          }}
+          title="Eliminar Usuario"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              ¿Está seguro que desea eliminar al usuario {userToDelete?.name}?
+              Esta acción no se puede deshacer.
+            </p>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setUserToDelete(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={isDeleting}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Eliminando...
+                  </>
+                ) : (
+                  'Eliminar Usuario'
+                )}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </DashboardLayout>
   );

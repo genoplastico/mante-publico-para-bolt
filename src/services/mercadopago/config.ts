@@ -1,0 +1,5 @@
+export const MERCADOPAGO_CONFIG = {
+  API_KEY: 'TEST-8680696507199559-121800-93f9b90895241d4c85a8a42cf0121a1d-254346757',
+  BASE_URL: 'https://api.mercadopago.com/v1',
+  CURRENCY: 'USD'
+};

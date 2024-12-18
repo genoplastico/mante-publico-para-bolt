@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { User, UserRole } from '../types';
 
@@ -6,10 +6,20 @@ export class UserService {
   static async getUsers(): Promise<User[]> {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'));
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as User));
+      const users = await Promise.all(
+        querySnapshot.docs.map(async (doc) => {
+          const userData = doc.data();
+          return {
+            id: doc.id,
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            projectIds: userData.projectIds,
+            organizationId: userData.organizationId
+          } as User;
+        })
+      );
+      return users;
     } catch (error) {
       console.error('Error fetching users:', error);
       throw new Error('No se pudieron obtener los usuarios');
@@ -84,6 +94,22 @@ export class UserService {
     } catch (error) {
       console.error('Error fetching project users:', error);
       throw new Error('No se pudieron obtener los usuarios del proyecto');
+    }
+  }
+
+  static async deleteUser(userId: string): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        throw new Error('Usuario no encontrado');
+      }
+      
+      await deleteDoc(userRef);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error instanceof Error ? error : new Error('No se pudo eliminar el usuario');
     }
   }
 }

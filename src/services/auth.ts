@@ -144,7 +144,12 @@ export class AuthService {
         
         if (!isFirstUser) {
           // Si no es el primer usuario, crearlo como usuario normal
-          await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            id: userCredential.user.uid,
+            email: userCredential.user.email!,
+            name: newUser.name,
+            role: newUser.role
+          });
         }
 
         return newUser;
@@ -222,17 +227,20 @@ export class AuthService {
     return this.currentUser !== null;
   }
 
+  private static readonly ROLE_MAP = {
+    super: 'owner',
+    secondary: 'viewer'
+  } as const;
+
+  private static mapRole(role: string): SaasRole {
+    return this.ROLE_MAP[role as keyof typeof this.ROLE_MAP] || 'viewer';
+  }
+
   static hasPermission(permission: keyof UserPermissions): boolean {
     const user = this.getCurrentUser();
     if (!user) return false;
     
-    // Map legacy roles to new roles for permissions
-    const roleMap = {
-      super: 'owner',
-      secondary: 'viewer'
-    } as const;
-    
-    const mappedRole = roleMap[user.role as keyof typeof roleMap] || 'viewer';
+    const mappedRole = this.mapRole(user.role);
     return ROLE_PERMISSIONS[mappedRole]?.[permission] ?? false;
   }
 
@@ -240,13 +248,7 @@ export class AuthService {
     const user = this.getCurrentUser();
     if (!user) return null;
     
-    // Map legacy roles to new roles for permissions
-    const roleMap = {
-      super: 'owner',
-      secondary: 'viewer'
-    } as const;
-    
-    const mappedRole = roleMap[user.role as keyof typeof roleMap] || 'viewer';
+    const mappedRole = this.mapRole(user.role);
     return ROLE_PERMISSIONS[mappedRole] ?? null;
   }
 }

@@ -51,6 +51,8 @@ export function RegisterForm({ onSuccess, onCancel }: RegisterFormProps) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
       const userData: FirebaseUser = {
+        id: userCredential.user.uid,
+        email: email,
         name,
         role: 'secondary',
         projectIds: []
