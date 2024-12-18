@@ -86,6 +86,8 @@ export interface Document {
   status: DocumentStatus;
   uploadedAt: string;
   workerId?: string;
+  workerName: string; // Ahora es requerido y siempre tendrá un valor
+  documentType?: string;
   projectId?: string;
   metadata: {
     description?: string;

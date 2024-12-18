@@ -1,21 +1,11 @@
 import React from 'react';
 import { FileText, Download, Trash2, User } from 'lucide-react';
 import { DocumentStatus } from '../../components/ui/DocumentStatus';
-import type { Document, Worker } from '../../types';
+import type { Document } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../../hooks/useAuth';
-import { WorkerService } from '../../services/workers';
-
-const DOCUMENT_TYPES: Record<Document['type'], string> = {
-  carnet_salud: 'Carnet de Salud',
-  cert_seguridad: 'Certificado de Seguridad',
-  entrega_epp: 'Entrega de EPP',
-  recibo_sueldo: 'Recibo de Sueldo',
-  cert_dgi: 'Certificado DGI',
-  cert_bps: 'Certificado BPS',
-  cert_seguro: 'Certificado de Seguro'
-};
+import { DOCUMENT_TYPES } from '../../services/documents/constants';
 
 interface DocumentListProps {
   documents: Document[];
@@ -24,39 +14,18 @@ interface DocumentListProps {
 
 export function DocumentList({ documents, onDelete }: DocumentListProps) {
   const { hasPermission } = useAuth();
-  const [workers, setWorkers] = React.useState<Record<string, Worker>>({});
   const canDelete = hasPermission('deleteDocument');
-  
-  React.useEffect(() => {
-    const loadWorkers = async () => {
-      if (!documents?.length) return;
-      
-      const workerIds = [...new Set(documents.map(doc => doc.workerId).filter(Boolean))];
-      if (workerIds.length === 0) return;
-      
-      try {
-        const fetchedWorkers = await WorkerService.getWorkers();
-        const workersMap = fetchedWorkers.reduce((acc, worker) => {
-          acc[worker.id] = worker;
-          return acc;
-        }, {} as Record<string, Worker>);
-        setWorkers(workersMap);
-      } catch (error) {
-        console.error('Error loading workers:', error);
-      }
-    };
-    
-    loadWorkers();
-  }, [documents]);
 
-  if (!documents?.length) {
+  if (!Array.isArray(documents) || documents.length === 0) {
     return (
       <div className="text-center py-8">
-        <FileText className="mx-auto h-12 w-12 text-gray-400" />
+        <div className="flex justify-center">
+          <FileText className="h-12 w-12 text-gray-400" />
+        </div>
         <h3 className="mt-2 text-sm font-medium text-gray-900">No hay documentos</h3>
         <p className="mt-1 text-sm text-gray-500">
-          {documents === undefined 
-            ? 'Utilice los filtros para buscar documentos'
+          {!Array.isArray(documents)
+            ? 'No hay documentos disponibles'
             : 'No se encontraron documentos que coincidan con los criterios de búsqueda.'
           }
         </p>
@@ -75,14 +44,12 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
                   <FileText className="h-5 w-5 text-blue-500" />
                   <div className="ml-4 flex-1">
                     <p className="font-medium text-gray-900">
-                      {DOCUMENT_TYPES[document.type]}
+                      {document.documentType || DOCUMENT_TYPES[document.type] || document.type}
                     </p>
-                    {document.workerId && workers[document.workerId] && (
-                      <div className="flex items-center mt-1 text-sm text-gray-500">
-                        <User className="h-4 w-4 mr-1.5 text-gray-400" />
-                        {workers[document.workerId].name}
-                      </div>
-                    )}
+                    <div className="flex items-center mt-1 text-sm text-gray-500">
+                      <User className="h-4 w-4 mr-1.5 text-gray-400" />
+                      {document.workerName || 'Trabajador no encontrado'}
+                    </div>
                     <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
                       <span>
                         Subido el {format(new Date(document.uploadedAt), "d 'de' MMMM 'de' yyyy", { locale: es })}

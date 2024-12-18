@@ -2,21 +2,16 @@ import React from 'react';
 import { Filter, X } from 'lucide-react';
 import type { DocumentType, DocumentStatus } from '../../types';
 import type { SearchFilters } from '../../services/documents/search/types';
+import { DOCUMENT_TYPES } from '../../services/documents/constants';
 
 interface DocumentSearchFiltersProps {
   onFiltersChange: (filters: SearchFilters) => void;
-  initialFilters?: SearchFilters;
 }
 
-const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
-  { value: 'carnet_salud', label: 'Carnet de Salud' },
-  { value: 'cert_seguridad', label: 'Certificado de Seguridad' },
-  { value: 'entrega_epp', label: 'Entrega de EPP' },
-  { value: 'recibo_sueldo', label: 'Recibo de Sueldo' },
-  { value: 'cert_dgi', label: 'Certificado DGI' },
-  { value: 'cert_bps', label: 'Certificado BPS' },
-  { value: 'cert_seguro', label: 'Certificado de Seguro' }
-];
+const DOCUMENT_TYPE_OPTIONS = Object.entries(DOCUMENT_TYPES).map(([value, label]) => ({
+  value: value as DocumentType,
+  label
+}));
 
 const DOCUMENT_STATUSES: Array<{ value: DocumentStatus; label: string }> = [
   { value: 'valid', label: 'Vigente' },
@@ -24,35 +19,31 @@ const DOCUMENT_STATUSES: Array<{ value: DocumentStatus; label: string }> = [
   { value: 'expiring_soon', label: 'Por vencer' }
 ];
 
-export function DocumentSearchFilters({ onFiltersChange, initialFilters }: DocumentSearchFiltersProps) {
+export function DocumentSearchFilters({ onFiltersChange }: DocumentSearchFiltersProps) {
   const [showFilters, setShowFilters] = React.useState(false);
-  const [selectedTypes, setSelectedTypes] = React.useState<DocumentType[]>(
-    initialFilters?.type || []
-  );
-  const [selectedStatuses, setSelectedStatuses] = React.useState<DocumentStatus[]>(
-    initialFilters?.status || []
-  );
-  const [dateRange, setDateRange] = React.useState(initialFilters?.dateRange);
+  const [selectedTypes, setSelectedTypes] = React.useState<DocumentType[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = React.useState<DocumentStatus[]>([]);
 
   const updateFilters = React.useCallback(() => {
     const filters: SearchFilters = {};
     
-    if (selectedTypes.length) filters.type = selectedTypes;
-    if (selectedStatuses.length) filters.status = selectedStatuses;
-    if (dateRange?.start || dateRange?.end) filters.dateRange = dateRange;
+    if (selectedTypes.length > 0) filters.type = selectedTypes;
+    if (selectedStatuses.length > 0) filters.status = selectedStatuses;
     
     onFiltersChange(filters);
-  }, [selectedTypes, selectedStatuses, dateRange, onFiltersChange]);
-
-  React.useEffect(() => {
-    updateFilters();
-  }, [updateFilters]);
+  }, [selectedTypes, selectedStatuses, onFiltersChange]);
 
   const clearFilters = () => {
     setSelectedTypes([]);
     setSelectedStatuses([]);
-    setDateRange(undefined);
+    updateFilters();
   };
+
+  React.useEffect(() => {
+    if (selectedTypes.length > 0 || selectedStatuses.length > 0) {
+      updateFilters();
+    }
+  }, [selectedTypes, selectedStatuses, updateFilters]);
 
   return (
     <div className="space-y-4">
@@ -69,7 +60,7 @@ export function DocumentSearchFilters({ onFiltersChange, initialFilters }: Docum
           Filtros
         </button>
 
-        {(selectedTypes.length > 0 || selectedStatuses.length > 0 || dateRange) && (
+        {(selectedTypes.length > 0 || selectedStatuses.length > 0) && (
           <button
             onClick={clearFilters}
             className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
@@ -87,7 +78,7 @@ export function DocumentSearchFilters({ onFiltersChange, initialFilters }: Docum
               Tipo de documento
             </label>
             <div className="flex flex-wrap gap-2">
-              {DOCUMENT_TYPES.map(({ value, label }) => (
+              {DOCUMENT_TYPE_OPTIONS.map(({ value, label }) => (
                 <label
                   key={value}
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
@@ -143,37 +134,6 @@ export function DocumentSearchFilters({ onFiltersChange, initialFilters }: Docum
                   {label}
                 </label>
               ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Fecha desde
-              </label>
-              <input
-                type="date"
-                value={dateRange?.start || ''}
-                onChange={(e) => setDateRange({
-                  ...dateRange,
-                  start: e.target.value
-                })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Fecha hasta
-              </label>
-              <input
-                type="date"
-                value={dateRange?.end || ''}
-                onChange={(e) => setDateRange({
-                  ...dateRange,
-                  end: e.target.value
-                })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
             </div>
           </div>
         </div>

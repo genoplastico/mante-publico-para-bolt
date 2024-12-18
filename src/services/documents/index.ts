@@ -134,6 +134,8 @@ export class DocumentService {
         uploadedAt: now,
         expiryDate,
         workerId,
+        createdBy: user.id,
+        workerName: worker.name,
         metadata: {
           description: metadata.description,
           keywords: metadata.keywords,

@@ -1,94 +1,79 @@
-import {
-  collection,
-  query,
-  getDocs,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  QuerySnapshot,
-  DocumentSnapshot
-} from 'firebase/firestore';
+import { collection, query, getDocs, where, QueryConstraint } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { AuthService } from '../../auth';
-import { SEARCH_CONFIG } from './constants';
-import { buildSearchQuery, normalizeSearchText, calculateRelevanceScore } from './utils';
-import type { Document } from '../../../types';
-import type { SearchOptions } from './types';
+import { DOCUMENT_TYPES } from '../constants';
+import { getWorkersMap } from './workers';
+import type { Document, DocumentType } from '../../../types';
+import type { SearchFilters } from './types';
+
+interface SearchQuery {
+  text?: string;
+  filters?: SearchFilters;
+}
 
 export class DocumentSearchService {
-  static async searchDocuments(
-    searchText: string = '',
-    options: SearchOptions = {}
-  ): Promise<{
-    documents: Document[];
-    hasMore: boolean;
-    lastDoc?: DocumentSnapshot;
-  }> {
+  static async searchDocuments(searchQuery: SearchQuery = {}): Promise<Document[]> {
     try {
       const user = AuthService.getCurrentUser();
       if (!user) {
         throw new Error('Usuario no autenticado');
       }
 
-      // Aplicar filtros iniciales
-      const constraints: QueryConstraint[] = [];
+      // Construir constraints base
+      const constraints: QueryConstraint[] = [
+        where('createdBy', '==', user.id)
+      ];
 
-      // Aplicar restricciones de usuario
-      if (user.role === 'secondary' && user.projectIds?.length) {
-        constraints.push(where('projectId', 'in', user.projectIds));
-      }
-
-      // Aplicar filtros de tipo de documento
-      if (options.filters?.type?.length) {
-        constraints.push(where('type', 'in', options.filters.type));
+      // Aplicar filtros de tipo
+      if (searchQuery.filters?.type?.length) {
+        constraints.push(where('type', 'in', searchQuery.filters.type));
       }
 
       // Aplicar filtros de estado
-      if (options.filters?.status?.length) {
-        constraints.push(where('status', 'in', options.filters.status));
+      if (searchQuery.filters?.status?.length) {
+        constraints.push(where('status', 'in', searchQuery.filters.status));
       }
 
-      // Aplicar filtros de fecha
-      if (options.filters?.dateRange) {
-        if (options.filters.dateRange.start) {
-          constraints.push(where('uploadedAt', '>=', options.filters.dateRange.start));
-        }
-        if (options.filters.dateRange.end) {
-          constraints.push(where('uploadedAt', '<=', options.filters.dateRange.end));
-        }
-      }
-
-      // Construir query final
-      const finalQuery = query(collection(db, 'documents'), ...constraints);
+      // Obtener mapa de trabajadores
+      const workersMap = await getWorkersMap();
 
       // Ejecutar búsqueda
-      const snapshot = await getDocs(finalQuery);
+      const q = query(collection(db, 'documents'), ...constraints);
+      const snapshot = await getDocs(q);
       
-      // Procesar resultados
-      let documents = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Document));
+      let documents = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const documentType = DOCUMENT_TYPES[data.type as DocumentType];
+        const workerName = data.workerId ? workersMap.get(data.workerId)?.name : 'Trabajador no encontrado';
 
-      // Aplicar búsqueda de texto si existe
-      if (searchText) {
-        const normalizedSearch = normalizeSearchText(searchText);
-        documents = documents
-          .filter(doc => this.documentMatchesSearch(doc, normalizedSearch))
-          .sort((a, b) => 
-            calculateRelevanceScore(b, searchText) - calculateRelevanceScore(a, searchText)
-          );
+        return {
+          id: doc.id,
+          ...data,
+          documentType,
+          workerName
+        } as Document;
+      });
+
+      // Aplicar filtro de texto si existe
+      if (searchQuery.text) {
+        const searchText = searchQuery.text.toLowerCase();
+        documents = documents.filter(doc => {
+          const searchableText = [
+            doc.documentType,
+            doc.workerName,
+            doc.metadata?.description,
+            ...(doc.metadata?.keywords || []),
+            ...(doc.metadata?.tags || [])
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+          return searchableText.includes(searchText);
+        });
       }
 
-      // Determinar si hay más resultados
-      const hasMore = documents.length === (options.pagination?.pageSize || SEARCH_CONFIG.PAGE_SIZE);
-
-      return {
-        documents,
-        hasMore,
-        lastDoc: snapshot.docs[snapshot.docs.length - 1]
-      };
+      return documents;
     } catch (error) {
       console.error('Error searching documents:', error);
       throw error instanceof Error 
@@ -96,24 +81,4 @@ export class DocumentSearchService {
         : new Error('Error al buscar documentos');
     }
   }
-
-  private static documentMatchesSearch(document: Document, normalizedSearch: string): boolean {
-    // Buscar en campos indexados
-    return SEARCH_CONFIG.SEARCHABLE_FIELDS.some(field => {
-      const value = this.getFieldValue(document, field);
-      if (Array.isArray(value)) {
-        return value.some(v => 
-          normalizeSearchText(String(v)).includes(normalizedSearch)
-        );
-      }
-      return normalizeSearchText(String(value || '')).includes(normalizedSearch);
-    });
-  }
-
-  private static getFieldValue(obj: any, path: string): any {
-    return path.split('.').reduce((acc, part) => acc?.[part], obj);
-  }
 }
-
-export type { SearchOptions, SearchFilters, SortOption, PaginationOptions } from './types';
-export { SEARCH_CONFIG } from './constants';

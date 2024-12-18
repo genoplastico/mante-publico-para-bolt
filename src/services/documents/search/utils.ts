@@ -1,98 +1,61 @@
-import { query, where, orderBy, limit, startAfter, QueryConstraint } from 'firebase/firestore';
-import { SEARCH_CONFIG } from './constants';
-import type { SearchOptions, SearchFilters } from './types';
+import { where, QueryConstraint } from 'firebase/firestore';
+import { DOCUMENT_TYPES } from '../constants';
+import type { SearchOptions } from './types';
+import type { Document } from '../../../types';
 
-export function buildSearchQuery(baseQuery: any, options: SearchOptions): QueryConstraint[] {
-  const constraints: QueryConstraint[] = [];
+export function buildSearchQuery(options: SearchOptions, userId: string): QueryConstraint[] {
+  const constraints: QueryConstraint[] = [
+    where('createdBy', '==', userId)
+  ];
 
-  // Aplicar filtros
-  if (options.filters) {
-    const filterConstraints = buildFilterConstraints(options.filters);
-    constraints.push(...filterConstraints);
+  // Aplicar filtros de tipo
+  if (options.filters?.type?.length) {
+    constraints.push(where('type', 'in', options.filters.type));
   }
 
-  // Aplicar ordenamiento
-  if (options.sort) {
-    constraints.push(orderBy(options.sort.field, options.sort.direction));
-  } else {
-    // Ordenamiento por defecto
-    constraints.push(orderBy('uploadedAt', 'desc'));
-  }
-
-  // Aplicar paginación
-  if (options.pagination) {
-    const pageSize = Math.min(
-      options.pagination.pageSize || SEARCH_CONFIG.PAGE_SIZE,
-      SEARCH_CONFIG.MAX_PAGE_SIZE
-    );
-    constraints.push(limit(pageSize));
+  // Aplicar filtros de estado
+  if (options.filters?.status?.length) {
+    constraints.push(where('status', 'in', options.filters.status));
   }
 
   return constraints;
 }
 
-function buildFilterConstraints(filters: SearchFilters): QueryConstraint[] {
-  const constraints: QueryConstraint[] = [];
+export function enrichSearchResults(documents: Document[], options: SearchOptions): Document[] {
+  let results = documents;
 
-  if (filters.type?.length) {
-    constraints.push(where('type', 'in', filters.type));
+  // Aplicar filtro de texto si existe
+  if (options.text) {
+    const searchText = options.text.toLowerCase();
+    results = results.filter(doc => {
+      const searchableText = [
+        doc.documentType, // Usar el tipo de documento formateado
+        doc.workerName,
+        doc.metadata?.description,
+        ...(doc.metadata?.keywords || []),
+        ...(doc.metadata?.tags || [])
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(searchText);
+    });
   }
 
-  if (filters.status?.length) {
-    constraints.push(where('status', 'in', filters.status));
+  // Aplicar filtro de fecha si existe
+  if (options.filters?.dateRange) {
+    const { start, end } = options.filters.dateRange;
+    const startDate = start ? new Date(start) : null;
+    const endDate = end ? new Date(end) : null;
+
+    results = results.filter(doc => {
+      const docDate = new Date(doc.uploadedAt);
+      if (startDate && docDate < startDate) return false;
+      if (endDate && docDate > endDate) return false;
+      return true;
+    });
   }
 
-  if (filters.dateRange) {
-    if (filters.dateRange.start) {
-      constraints.push(where('uploadedAt', '>=', filters.dateRange.start));
-    }
-    if (filters.dateRange.end) {
-      constraints.push(where('uploadedAt', '<=', filters.dateRange.end));
-    }
-  }
-
-  if (filters.metadata?.category) {
-    constraints.push(where('metadata.category', '==', filters.metadata.category));
-  }
-
-  if (filters.metadata?.tags?.length) {
-    constraints.push(where('metadata.tags', 'array-contains-any', filters.metadata.tags));
-  }
-
-  return constraints;
-}
-
-export function normalizeSearchText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
-export function calculateRelevanceScore(document: any, searchText: string): number {
-  let score = 0;
-  const normalizedSearch = normalizeSearchText(searchText);
-
-  // Puntuación por coincidencia exacta en nombre
-  if (normalizeSearchText(document.name).includes(normalizedSearch)) {
-    score += 10;
-  }
-
-  // Puntuación por coincidencia en palabras clave
-  if (document.metadata?.keywords) {
-    const matchingKeywords = document.metadata.keywords.filter(
-      (keyword: string) => normalizeSearchText(keyword).includes(normalizedSearch)
-    );
-    score += matchingKeywords.length * 5;
-  }
-
-  // Puntuación por coincidencia en descripción
-  if (document.metadata?.description) {
-    if (normalizeSearchText(document.metadata.description).includes(normalizedSearch)) {
-      score += 3;
-    }
-  }
-
-  return score;
+  return results;
 }
